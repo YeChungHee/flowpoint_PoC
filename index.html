@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>플로우포인트 테스트</title>
+<style>
+:root{
+  --bg:#F2F2F7;--surface:#FFFFFF;--fill:rgba(118,118,128,.12);--fill2:rgba(118,118,128,.08);
+  --ink:#000000;--muted:rgba(60,60,67,.62);--line:rgba(60,60,67,.18);
+  --brand:#007AFF;--brand-ink:#FFFFFF;--brand-soft:rgba(0,122,255,.10);
+  --in:#248A3D;--out:#5856D6;--alert:#D70015;--alert-soft:rgba(255,59,48,.10);--warn:#C93400;--warn-soft:rgba(255,149,0,.14);
+  --bar:rgba(249,249,249,.78);--shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  color-scheme:light;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000;--surface:#1C1C1E;--fill:rgba(118,118,128,.24);--fill2:rgba(118,118,128,.16);
+    --ink:#FFFFFF;--muted:rgba(235,235,245,.6);--line:rgba(84,84,88,.6);
+    --brand:#0A84FF;--brand-ink:#FFFFFF;--brand-soft:rgba(10,132,255,.18);
+    --in:#30D158;--out:#7D7AFF;--alert:#FF6961;--alert-soft:rgba(255,69,58,.16);--warn:#FFB340;--warn-soft:rgba(255,159,10,.18);
+    --bar:rgba(22,22,24,.78);--shadow:none;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000;--surface:#1C1C1E;--fill:rgba(118,118,128,.24);--fill2:rgba(118,118,128,.16);
+  --ink:#FFFFFF;--muted:rgba(235,235,245,.6);--line:rgba(84,84,88,.6);
+  --brand:#0A84FF;--brand-ink:#FFFFFF;--brand-soft:rgba(10,132,255,.18);
+  --in:#30D158;--out:#7D7AFF;--alert:#FF6961;--alert-soft:rgba(255,69,58,.16);--warn:#FFB340;--warn-soft:rgba(255,159,10,.18);
+  --bar:rgba(22,22,24,.78);--shadow:none;
+  color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Apple SD Gothic Neo","Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:15px;line-height:1.5;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;min-height:52px}
+.mark{font-weight:700;font-size:17px;color:var(--ink);letter-spacing:-.02em}
+.badge{font-size:12px;font-weight:500;color:var(--muted);background:var(--fill);border-radius:999px;padding:2px 9px}
+header nav{display:flex;gap:2px;overflow-x:auto;margin-left:auto}
+header nav a{color:var(--muted);text-decoration:none;padding:7px 12px;font-weight:500;font-size:15px;white-space:nowrap;border-radius:8px;transition:background .15s,color .15s}
+header nav a:hover{background:var(--fill2)}
+header nav a[aria-current="page"]{color:var(--brand);font-weight:600}
+main.wrap{padding-top:28px;padding-bottom:72px}
+h1{font-size:clamp(24px,3.6vw,32px);line-height:1.25;font-weight:700;margin:0 0 6px;letter-spacing:-.025em}
+h2{font-size:17px;font-weight:600;margin:0 0 12px;letter-spacing:-.015em}
+p{margin:0}
+.muted{color:var(--muted)}
+.hero h1 .neg{color:var(--alert)}
+.panel{background:var(--surface);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+.chart-box{margin:18px 0 0;overflow-x:auto}
+svg text{font-family:inherit;font-size:12px;fill:var(--muted)}
+.callout{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--alert-soft);border-radius:12px;padding:14px 16px;margin-top:16px}
+.callout p{max-width:60ch}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px}
+.rows{list-style:none;margin:0;padding:0}
+.rows li{display:grid;grid-template-columns:72px 1fr auto;gap:12px;padding:11px 0;border-top:.5px solid var(--line);align-items:center}
+.rows li:first-child{border-top:0}
+.rows .when{color:var(--muted);font-size:13px}
+.in{color:var(--in)} .out{color:var(--out)} .alert{color:var(--alert)}
+.empty{color:var(--muted);padding:10px 0}
+button,.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font:inherit;font-weight:600;font-size:15px;letter-spacing:-.01em;border-radius:12px;border:0;background:var(--fill);color:var(--brand);padding:9px 16px;cursor:pointer;transition:opacity .15s,transform .1s}
+button:hover:not(:disabled),.btn:hover{opacity:.85}
+button:active:not(:disabled){transform:scale(.98)}
+button.primary,button.hot{background:var(--brand);color:var(--brand-ink)}
+button.small{padding:6px 12px;font-size:13px;font-weight:600;border-radius:999px}
+button.small.primary{background:var(--brand);color:var(--brand-ink)}
+button:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 45%,transparent);outline-offset:2px}
+form.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+label{display:grid;gap:5px;font-size:13px;color:var(--muted);font-weight:500}
+input{font:inherit;font-size:15px;color:var(--ink);background:var(--fill2);border:1px solid transparent;border-radius:10px;padding:9px 12px;width:100%;transition:border-color .15s,background .15s}
+input:focus{outline:none;border-color:var(--brand);background:var(--surface)}
+input[type="checkbox"],input[type="radio"]{accent-color:var(--brand);width:18px;height:18px}
+.tbl{overflow-x:auto;margin-top:18px}
+table{border-collapse:collapse;width:100%;min-width:680px}
+th,td{text-align:left;padding:11px 8px;border-top:.5px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;border-top:0;text-transform:none}
+td.r,th.r{text-align:right}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.tag{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--brand-soft);color:var(--brand)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.steps span{font-size:13px;font-weight:500;padding:3px 11px;border-radius:999px;background:var(--fill2);color:var(--muted)}
+.steps span.on{background:var(--brand);color:var(--brand-ink)}
+.app{border-top:.5px solid var(--line);padding:16px 0}
+.app:first-of-type{border-top:0}
+.score{display:flex;align-items:baseline;gap:10px}
+.score b{font-size:40px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-.03em}
+dialog{border:0;border-radius:20px;padding:0;background:var(--surface);color:var(--ink);width:min(560px,calc(100% - 32px));box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(0,0,0,.35);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.dlg{padding:24px}
+.dlg h2{font-size:20px;font-weight:700;margin-bottom:14px}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;margin:0 0 16px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.dlg .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.stmt{background:var(--fill2);border-radius:12px;padding:16px}
+.stmt table{min-width:0}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(30,30,32,.82);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);color:#fff;padding:11px 18px;border-radius:999px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.toast.show{opacity:1}
+.view{display:none} .view.on{display:block}
+.section{margin-top:16px}
+footer{padding:22px 0;color:var(--muted);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.report{max-width:780px}
+.report h2{font-size:17px;margin:26px 0 8px}
+.figs{display:flex;gap:32px;flex-wrap:wrap;margin:16px 0 4px}
+.figs div{display:grid}
+.figs span{font-size:13px;color:var(--muted)}
+.figs b{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.todo{margin:0;padding-left:18px} .todo li{margin:5px 0}
+.docrow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px 0;border-top:.5px solid var(--line)}
+.docrow:first-child{border-top:0}
+.docrow small{display:block;color:var(--muted);font-size:13px}
+.step-h{font-weight:600;margin:18px 0 6px}
+label.check{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--ink)}
+label.check input{width:18px;flex:none}
+details summary{cursor:pointer;color:var(--brand);font-size:14px;font-weight:500;margin-top:10px}
+.dlg{max-height:85vh;overflow:auto}
+.sum{background:var(--brand-soft);border-radius:12px;padding:11px 14px;font-size:14px}
+.subtabs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 18px}
+.subtabs a{--c:var(--brand);--cs:var(--brand-soft);--ci:#FFFFFF;display:grid;gap:3px;padding:14px 18px;border-radius:14px;text-decoration:none;color:var(--c);background:var(--cs);border:2px solid transparent;transition:background .15s,color .15s,border-color .15s}
+.subtabs a[data-sub="factoring"]{--c:var(--warn);--cs:var(--warn-soft)}
+.subtabs a b{font-size:17px;font-weight:700;letter-spacing:-.02em}
+.subtabs a small{font-size:12px;font-weight:500;opacity:.85}
+.subtabs a.on{background:var(--c);color:var(--ci);box-shadow:var(--shadow)}
+.subtabs a:not(.on):hover{border-color:var(--c)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .subtabs a[data-sub="factoring"]{--ci:#1C1C1E}}
+:root[data-theme="dark"] .subtabs a[data-sub="factoring"]{--ci:#1C1C1E}
+.sub{display:none} .sub.on{display:block}
+.guide-item{background:var(--fill2);border-radius:12px;padding:14px 16px;margin-top:12px}
+.guide-item h3{font-size:15px;font-weight:600;margin:0 0 6px}
+.guide-item p{font-size:14px;color:var(--muted);margin:0 0 10px}
+.guide-item label.check{align-items:flex-start;font-weight:500;font-size:14px}
+.guide-item label.check input{margin-top:2px}
+.nav-sm{display:none}
+.locked{position:relative}
+.locked .blur{filter:blur(6px);pointer-events:none;user-select:none}
+.lockmsg{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:16px}
+.lockmsg p{font-size:14px;color:var(--ink);font-weight:500;max-width:36ch}
+.cgrade{font-size:44px;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--brand)}
+.mini th,.mini td{padding:8px 6px;font-size:14px}
+.mini table{min-width:420px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 4px}
+.chips button{background:var(--fill);color:var(--ink);font-weight:500;font-size:14px;padding:6px 14px;border-radius:999px}
+.chips button.on{background:var(--ink);color:var(--surface)}
+.fund{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:14px 0;border-top:.5px solid var(--line)}
+.fund:first-child{border-top:0}
+.fund h3{font-size:16px;font-weight:600;margin:4px 0 2px}
+.fund small{color:var(--muted);font-size:13px}
+.dday{font-size:13px;font-weight:600;white-space:nowrap}
+.backlink{display:inline-block;color:var(--brand);text-decoration:none;font-weight:500;margin-bottom:10px}
+.gr{display:inline-block;min-width:26px;text-align:center;font-size:12px;font-weight:700;border-radius:6px;padding:1px 6px}
+.gr-A{background:var(--brand-soft);color:var(--brand)} .gr-B{background:rgba(52,199,89,.14);color:var(--in)}
+.gr-C{background:var(--fill);color:var(--muted)} .gr-D{background:var(--alert-soft);color:var(--alert)}
+.up{color:var(--in)} .down{color:var(--alert)}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--fill2)}
+.spark{max-width:560px;display:block}
+.spark text{font-size:11px}
+.opt{display:grid;gap:8px;margin:6px 0 4px}
+#roleBtn{margin-left:4px;white-space:nowrap;flex:none}
+.mark,.badge{white-space:nowrap;flex:none}
+#roleBtn.rv{background:var(--warn-soft);color:var(--warn)}
+body:not(.reviewer) .rv-only{display:none}
+.why{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;font-size:14px}
+.why li{display:flex;justify-content:space-between;gap:10px}
+.why .pts{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.flags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.card{background:var(--fill2);border-radius:12px;padding:14px 16px;margin-top:12px}
+.card:first-child{margin-top:0}
+.card h3{font-size:15px;font-weight:600;margin:0 0 4px}
+.reasons{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.reasons label{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--ink);background:var(--surface);border-radius:999px;padding:4px 10px;font-weight:500}
+.reasons input{width:14px;height:14px}
+textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--fill2);border:1px solid transparent;border-radius:10px;padding:9px 12px;width:100%;min-height:90px}
+select{font:inherit;font-size:15px;color:var(--ink);background:var(--fill2);border:1px solid transparent;border-radius:10px;padding:9px 12px;width:100%}
+@media (max-width: 640px){
+  .nav-lg{display:none} .nav-sm{display:inline}
+  .fund{grid-template-columns:1fr}
+  header nav{justify-content:flex-start !important;overflow-x:auto;position:fixed;left:0;right:0;bottom:0;margin:0;gap:0;justify-content:space-around;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line);padding:4px 4px env(safe-area-inset-bottom,0px)}
+  header nav a{flex:1 0 64px;text-align:center;font-size:12px;padding:10px 0;border-radius:0;letter-spacing:-.03em}
+  header nav a:hover{background:none}
+  header{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--surface)}
+  main.wrap{padding-top:20px;padding-bottom:96px}
+  footer{padding-bottom:84px}
+  .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  .panel{padding:16px;border-radius:12px}
+}
+@media (prefers-reduced-motion: reduce){.toast,button,header nav a{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <span class="mark">플로우포인트</span><span class="badge">테스트 버전</span>
+    <button class="small" id="roleBtn" type="button" aria-label="역할 전환"></button>
+    <nav aria-label="주요 메뉴">
+      <a href="#review" data-v="review" class="rv-only">심사</a>
+      <a href="#home" data-v="home">홈</a>
+      <a href="#report" data-v="report">자금일보</a>
+      <a href="#orders" data-v="orders">매입업무</a>
+      <a href="#sales" data-v="sales">매출업무</a>
+      <a href="#score" data-v="score"><span class="nav-lg">플로우스코어</span><span class="nav-sm">스코어</span></a>
+      <a href="#fund" data-v="fund"><span class="nav-lg">정책자금·지원사업</span><span class="nav-sm">지원사업</span></a>
+      <a href="#flowpay" data-v="flowpay">서비스 진행</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- HOME -->
+  <section class="view" id="v-home">
+    <div class="panel hero">
+      <h1 id="headline"></h1>
+      <p class="muted" id="subline"></p>
+      <div class="chart-box"><svg id="chart" viewBox="0 0 720 230" width="100%" role="img" aria-label="30일 잔고 예측 그래프"></svg></div>
+      <div id="callout"></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>들어올 돈 (14일)</h2><ul class="rows" id="inList"></ul></div>
+      <div class="panel"><h2>나갈 돈 (14일)</h2><ul class="rows" id="outList"></ul></div>
+    </div>
+    <div class="panel section" id="overdueBox"></div>
+  </section>
+
+  <!-- REPORT -->
+  <section class="view" id="v-report"><div class="panel report" id="reportBody"></div></section>
+
+  <!-- ORDERS -->
+  <section class="view" id="v-orders">
+    <div class="panel">
+      <h2>새 발주서 보내기</h2>
+      <form class="entry" id="orderForm">
+        <label>매입처<input name="party" required placeholder="예: 대성원료"></label>
+        <label>품목<input name="item" required placeholder="예: 면 원단"></label>
+        <label>수량<input name="qty" type="number" min="1" required></label>
+        <label>단가(원)<input name="price" type="number" min="1" required></label>
+        <label>결제일<input name="due" type="date" required></label>
+        <button class="primary" type="submit">발주서 보내기</button>
+      </form>
+      <div class="tbl"><table>
+        <thead><tr><th>결제일</th><th>매입처</th><th>품목</th><th class="r">금액(VAT 포함)</th><th>상태</th><th>작업</th></tr></thead>
+        <tbody id="orderRows"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- SALES -->
+  <section class="view" id="v-sales">
+    <div class="panel">
+      <h2>거래명세서 발행</h2>
+      <form class="entry" id="saleForm">
+        <label>고객사<input name="party" required placeholder="예: 그린마켓"></label>
+        <label>품목<input name="item" required placeholder="예: 완제품 A"></label>
+        <label>수량<input name="qty" type="number" min="1" required></label>
+        <label>단가(원)<input name="price" type="number" min="1" required></label>
+        <label>입금 예정일<input name="due" type="date" required></label>
+        <button class="primary" type="submit">명세서 발행</button>
+      </form>
+      <div class="tbl"><table>
+        <thead><tr><th>입금 예정일</th><th>고객사</th><th>품목</th><th class="r">금액(VAT 포함)</th><th>상태</th><th>작업</th></tr></thead>
+        <tbody id="saleRows"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- SCORE -->
+  <section class="view" id="v-score">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+        <div><p class="muted" id="scMeta"></p><h1 id="scTitle"></h1></div>
+        <button class="small primary" data-act="scSend">이번 달 리포트 보내기 (테스트)</button>
+      </div>
+      <div class="figs" id="scFigs"></div>
+      <p class="muted" style="font-size:13px;margin-top:10px">플로우스코어는 우리 회사와의 거래 데이터와 공개 정보로 만든 참고 지표입니다. 테스트용 산식이며 실제 신용평가가 아닙니다. 업체를 누르면 상세 정보와 추가 정보 요청 화면이 열립니다.</p>
+    </div>
+    <div class="panel section"><h2>매출처 (받을 돈 상대)</h2><div class="tbl" style="margin-top:0"><table>
+      <thead><tr><th>업체</th><th>플로우스코어</th><th>전월 대비</th><th class="r">거래 금액</th><th>신호</th><th></th></tr></thead><tbody id="scSales"></tbody></table></div></div>
+    <div class="panel section"><h2>매입처 (줄 돈 상대)</h2><div class="tbl" style="margin-top:0"><table>
+      <thead><tr><th>업체</th><th>플로우스코어</th><th>전월 대비</th><th class="r">거래 금액</th><th>신호</th><th></th></tr></thead><tbody id="scBuys"></tbody></table></div></div>
+    <div class="panel section"><h2>정보 요청 내역</h2><div id="scReqs"></div></div>
+    <div class="panel section"><h2>점수 변동 기록</h2><p class="muted" style="font-size:14px;margin-bottom:6px">거래 입력, 입금, 세금계산서 발행, 플로우페이 상환·연체가 생길 때마다 어느 점수가 왜 바뀌었는지 남깁니다.</p><div id="scLog"></div></div>
+  </section>
+
+  <!-- REVIEW (심사역) -->
+  <section class="view" id="v-review">
+    <div class="panel">
+      <p class="muted">심사역 화면</p>
+      <h1>플로우페이 심사</h1>
+      <p class="muted" style="margin-top:4px">점수와 근거를 보고 승인하거나 반려합니다. 판단 사유는 정해진 항목에서 고르며, 이 기록과 이후 상환 결과가 플로우스코어를 학습시킬 정답 데이터가 됩니다.</p>
+    </div>
+    <div class="panel section"><h2>심사 대기</h2><div id="rvQueue"></div></div>
+    <div class="panel section"><h2>집행 후 관리</h2><p class="muted" style="font-size:14px;margin-bottom:6px">상환 결과를 기록하면 우리 회사와 관련 거래처의 플로우스코어에 바로 반영됩니다.</p><div id="rvAfter"></div></div>
+    <div class="panel section"><h2>이의 제기</h2><div id="rvDisputes"></div></div>
+    <div class="panel section"><h2>판단 기록 (정답 데이터)</h2><div id="rvLog"></div></div>
+  </section>
+
+  <!-- COMPANY REPORT -->
+  <section class="view" id="v-company"><div id="coBody"></div></section>
+
+  <!-- FUND -->
+  <section class="view" id="v-fund">
+    <div class="panel">
+      <p class="muted">정책자금·지원사업</p>
+      <h1>우리 회사에 맞는 정책자금과 지원사업</h1>
+      <p class="muted" id="fdCond" style="margin-top:4px"></p>
+      <div class="chips" id="fdChips"></div>
+    </div>
+    <div class="panel section"><div id="fdList"></div></div>
+    <p class="muted" style="font-size:13px;margin-top:12px">예시 데이터이며 실제 공고가 아닙니다. 실제 서비스에서는 공공 공고 데이터와 연동해 매일 갱신합니다.</p>
+  </section>
+
+  <!-- FLOWPAY -->
+  <section class="view" id="v-flowpay">
+    <nav class="subtabs" aria-label="서비스 진행 메뉴"><a href="#flowpay" data-sub="flowpay"><b>플로우페이</b><small>매입 자금 선결제, 세금계산서 미발행 매출과 묶음</small></a><a href="#factoring" data-sub="factoring"><b>매출채권유동화</b><small>받을 돈 먼저 받기, 세금계산서 발행 매출</small></a></nav>
+    <div class="sub" id="sub-flowpay">
+    <div class="grid2" style="margin-top:0">
+      <div class="panel">
+        <h2>플로우스코어</h2>
+        <div class="score"><b class="num" id="score"></b><span class="muted">/ 900</span></div>
+        <p class="muted" id="scoreNote" style="margin-top:8px"></p>
+        <ul class="why" id="scoreWhy"></ul>
+        <p class="sum" id="limitNote" style="margin-top:10px"></p>
+        <div class="acts" style="margin-top:10px"><button class="small" data-act="myScore">점수 근거와 변동 기록</button><button class="small" data-act="dispute" data-target="우리 회사">이의 제기</button></div>
+        <p class="muted" style="font-size:12px;margin-top:8px">플로우스코어는 참고 지표이며 신용평가가 아닙니다. 산식과 한도는 테스트용 가정값입니다.</p>
+      </div>
+      <div class="panel">
+        <h2>마일리지</h2>
+        <div class="score"><b class="num" id="mBal"></b></div>
+        <p class="muted" style="margin:8px 0 4px;font-size:14px">혜택이나 정산할 금액을 쌓아 두었다가 다음 신청 때 상환 금액이나 할인료에서 차감합니다.</p>
+        <ul class="rows" id="mRows"></ul>
+        <button class="small" data-act="mSettle" style="margin-top:8px">정산 금액 적립하기 (테스트)</button>
+      </div>
+    </div>
+    <div class="panel section">
+      <h2>플로우페이 신청 내역</h2>
+      <div id="apps"></div>
+    </div>
+    </div>
+    <div class="sub" id="sub-factoring">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+        <h2 style="margin:0">유동화할 수 있는 매출채권</h2>
+      </div>
+      <p class="muted" style="margin:6px 0 4px;font-size:14px">입금을 기다리는 매출채권을 플로우페이에 넘기고 자금을 먼저 받습니다. 세금계산서를 발행한 매출만 신청할 수 있고(연체·입금 완료 건 제외), 미발행 매출은 매입업무에서 플로우페이로 신청합니다.</p>
+      <ul class="rows" id="arRows"></ul>
+    </div>
+    <div class="panel section">
+      <h2>유동화 신청 내역</h2>
+      <div id="appsAr"></div>
+    </div>
+    </div>
+    <div class="panel section">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+        <h2 style="margin:0">기업 서류함</h2>
+        <label class="check"><input type="checkbox" id="consent"> 서류 보관·재사용 동의</label>
+      </div>
+      <p class="muted" style="margin:6px 0 10px;font-size:14px">최초 신청 때 올린 서류를 보관해 두고, 다음 신청에서는 유효기간이 지났거나 반려된 서류만 다시 받습니다. 유효기간은 테스트 값이며 실제 기준은 심사 부서가 정합니다.</p>
+      <div class="tbl" style="margin-top:0"><table>
+        <thead><tr><th>서류</th><th>발급일</th><th>유효기간</th><th>상태</th><th>작업</th></tr></thead>
+        <tbody id="docRows"></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>테스트 페이지입니다. 입력한 내용은 이 브라우저에만 저장되며, 금액과 수수료는 가정값입니다.</span>
+    <button class="small" id="resetBtn" type="button">처음부터 다시 (시나리오 초기화)</button>
+  </div>
+</footer>
+
+<dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  const KEY = 'flowpoint-test-v6';
+  const EARN = 0.001;
+  let useM = true, curApply = null;
+  const SOON = 7;
+  const DOCS = [
+    { key: 'biz', name: '사업자등록증', days: null },
+    { key: 'corp', name: '법인등기부등본', days: 90 },
+    { key: 'seal', name: '법인 인감증명서', days: 90 },
+    { key: 'ntax', name: '국세납부증명서', days: 90 },
+    { key: 'ltax', name: '지방세납부증명서', days: 90 },
+    { key: 'ins', name: '4대보험 가입증명서', days: 90 },
+    { key: 'fin', name: '재무제표 3개년', days: 365, term: '매년 결산 후 갱신' },
+    { key: 'buyTax', name: '매입 (세금)계산서 합계표 2개년', days: 365, term: '매년 갱신' },
+    { key: 'saleTax', name: '매출 (세금)계산서 합계표 2개년', days: 365, term: '매년 갱신' },
+    { key: 'holders', name: '주주명부', days: null, term: '변동 시 갱신' },
+    { key: 'bank', name: '주거래은행 통장사본', days: null, term: '계좌 변경 시 갱신' },
+    { key: 'id', name: '대표자 신분증 사본', days: null },
+    { key: 'vat', name: '부가세 과세표준증명원', days: 90, minAmt: 15000000 },
+  ];
+  const FEE_BUY = 0.02, FEE_AR = 0.02, TERM_DAYS = 60;
+
+  /* ---------- dates & money ---------- */
+  function today0(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+  function iso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function addDays(n, from){ const d = from ? parse(from) : today0(); d.setDate(d.getDate()+n); return iso(d); }
+  function parse(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+  function diff(s){ return Math.round((parse(s) - today0()) / 86400000); }
+  function md(s){ const d = parse(s); return (d.getMonth()+1) + '월 ' + d.getDate() + '일'; }
+  function when(n){ return n === 0 ? '오늘' : n > 0 ? n + '일 뒤' : (-n) + '일 지남'; }
+  function man(n){ const v = Math.round(n / 10000); return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('ko-KR') + '만원'; }
+  function won(n){ return Math.round(n).toLocaleString('ko-KR') + '원'; }
+  function total(x){ return Math.round(x.qty * x.price * 1.1); }
+  function uid(){ return Math.random().toString(36).slice(2, 9); }
+  function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  /* ---------- state ---------- */
+  // 시나리오 거래 만들기: 날짜는 오늘 기준 며칠 전·후
+  function B(party, item, qty, price, ord, due, paid){
+    return { id: uid(), party, item, qty, price, ordered: addDays(ord), due: addDays(due), status: paid == null ? 'ordered' : 'paid', paidOn: paid == null ? undefined : addDays(paid) };
+  }
+  function A(party, item, qty, price, iss, due, paid, tax){
+    return { id: uid(), party, item, qty, price, issued: addDays(iss), due: addDays(due), status: paid == null ? 'open' : 'paid', paidOn: paid == null ? undefined : addDays(paid), reminded: 0, tax: tax || 'issued', confirm: 'none' };
+  }
+  function seed(){
+    return {
+      company: '테스트상사(주)',
+      cash: 10000000,
+      role: 'customer',
+      purchases: [
+        // 매입처 5곳, 3개월치. paidOn = 실제 지급일
+        B('대성원료', '면 원단', 300, 22000, -85, -60, -60),
+        B('대성원료', '면 원단', 350, 22000, -55, -30, -30),
+        B('대성원료', '면 원단', 400, 22000, -20, 5),
+        B('대성원료', '면 원단', 650, 22000, -5, 18),
+        B('한빛패키지', '포장 박스', 2500, 1300, -70, -45, -44),
+        B('한빛패키지', '포장 박스', 3000, 1300, -30, 12),
+        B('세진화학', '염료', 200, 25000, -65, -35, -35),
+        B('세진화학', '염료', 200, 25000, -10, 20),
+        B('동아물류', '운송 용역', 10, 270000, -40, -10, -10),
+        B('동아물류', '운송 용역', 10, 270000, -3, 27),
+        B('미래라벨', '라벨 인쇄', 9000, 200, -50, -20, -15),
+        B('미래라벨', '라벨 인쇄', 9000, 200, -8, 22),
+      ],
+      sales: [
+        // 매출처 5곳, 3개월치. paidOn = 실제 입금일, tax = 세금계산서 발행 여부
+        A('그린마켓', '완제품 A', 220, 24000, -85, -55, -55),
+        A('그린마켓', '완제품 A', 240, 24000, -60, -30, -31),
+        A('그린마켓', '완제품 A', 250, 24000, -27, 3),
+        A('그린마켓', '완제품 A', 470, 24000, -5, 25, null, 'none'),
+        A('오렌지유통', '완제품 B', 280, 22000, -80, -50, -50),
+        A('오렌지유통', '완제품 B', 260, 22000, -50, -20, -18),
+        A('오렌지유통', '완제품 B', 300, 22000, -20, 10),
+        // 리스크 사례 1: 입금이 반복해서 늦는 매출처
+        A('브라이트몰', '완제품 A', 130, 25000, -88, -58, -45),
+        A('브라이트몰', '완제품 A', 110, 25000, -64, -34, -22),
+        A('브라이트몰', '완제품 A', 120, 25000, -34, -4),
+        A('누리상회', '완제품 C', 100, 30000, -70, -40, -40),
+        A('누리상회', '완제품 C', 100, 30000, -15, 15),
+        // 리스크 사례 2: 세금계산서 미발행 매출이 많은 매출처
+        A('한결푸드', '완제품 B', 180, 20000, -75, -45, -44),
+        A('한결푸드', '완제품 B', 160, 20000, -48, -18, -18, 'none'),
+        A('한결푸드', '완제품 B', 200, 20000, -45, 5, null, 'none'),
+        A('한결푸드', '완제품 B', 150, 20000, -10, 20, null, 'none'),
+      ],
+      apps: [],
+      scoreLog: [],
+      disputes: [],
+      reqs: [],
+      fav: [],
+      consent: true,
+      mileage: [
+        { date: addDays(-60), amt: 100000, kind: '혜택', label: '신규 가입 혜택' },
+        { date: addDays(-20), amt: 184000, kind: '정산', label: '조기 상환 수수료 차액 (지난 신청)' },
+      ],
+      docs: {
+        biz: { issued: addDays(-130), status: 'ok' },
+        corp: { issued: addDays(-130), status: 'ok' },
+        seal: { issued: addDays(-85), status: 'ok' },
+        ntax: { issued: addDays(-12), status: 'ok' },
+        ltax: { issued: addDays(-12), status: 'ok' },
+        ins: { issued: addDays(-12), status: 'ok' },
+        fin: { issued: addDays(-200), status: 'ok' },
+        buyTax: { issued: addDays(-200), status: 'ok' },
+        saleTax: { issued: addDays(-200), status: 'ok' },
+        holders: { issued: addDays(-130), status: 'ok' },
+        bank: { issued: addDays(-130), status: 'ok' },
+        id: { issued: addDays(-130), status: 'rejected', note: '사본이 흐려 식별할 수 없습니다' },
+      },
+      log: [
+        { date: addDays(-1), amt: 4400000, label: '누리상회 입금' },
+        { date: addDays(-1), amt: -1850000, label: '한빛패키지 대금' },
+      ],
+    };
+  }
+  let S;
+  function load(){
+    try { const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : seed(); }
+    catch(e){ S = seed(); }
+    if (!S || !Array.isArray(S.purchases) || !S.docs || !S.log || !S.mileage) S = seed();
+    if (!S.reqs) S.reqs = [];
+    if (!S.fav) S.fav = [];
+    if (!S.scoreLog) S.scoreLog = [];
+    if (!S.disputes) S.disputes = [];
+    if (!S.role) S.role = 'customer';
+  }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+
+  /* ---------- cash-flow model ---------- */
+  function events(){
+    const ev = [];
+    S.purchases.forEach(p => {
+      if (p.status === 'ordered') ev.push({ day: Math.max(0, diff(p.due)), amt: -total(p), label: p.party + ' 대금', kind: 'out' });
+      if (p.status === 'financed'){ const r = p.links ? (p.remain || 0) : p.repayAmount; if (r > 0) ev.push({ day: Math.max(0, diff(p.repayDate)), amt: -r, label: '플로우페이 상환' + (p.links ? ' 부족분' : '') + ' (' + p.party + ')', kind: 'out' }); }
+    });
+    S.sales.forEach(s => {
+      if (s.status === 'open' && diff(s.due) >= 0) ev.push({ day: diff(s.due), amt: total(s), label: s.party + ' 입금', kind: 'in' });
+      if (s.status === 'bundled' && diff(s.due) >= 0 && total(s) - s.alloc > 0) ev.push({ day: diff(s.due), amt: total(s) - s.alloc, label: s.party + ' 입금 (상환 후 잔액)', kind: 'in' });
+    });
+    return ev.sort((a,b) => a.day - b.day);
+  }
+  function forecast(){
+    const ev = events(), bal = [];
+    for (let d = 0; d <= 30; d++){
+      const delta = ev.filter(e => e.day === d).reduce((t,e) => t + e.amt, 0);
+      bal.push((d === 0 ? S.cash : bal[d-1]) + delta);
+    }
+    return bal;
+  }
+  function overdue(){ return S.sales.filter(s => s.status === 'open' && diff(s.due) < 0); }
+  function appFor(ref){ return S.apps.find(a => (a.refId === ref || (a.links || []).includes(ref)) && a.status !== 'done' && a.status !== 'rejected'); }
+  function eligibleSales(){ return S.sales.filter(x => x.status === 'open' && x.tax !== 'issued' && !appFor(x.id)).sort((x,y) => x.due < y.due ? -1 : 1); }
+  function move(amt, label){ S.cash += amt; S.log.push({ date: iso(today0()), amt, label }); }
+  function mBal(){ return S.mileage.reduce((a,m) => a + m.amt, 0); }
+  function mCap(type, amt){ return type === 'buy' ? Math.round(amt * (1 + FEE_BUY)) : Math.round(amt * FEE_AR); }
+  function mUse(type, amt){ return useM ? Math.min(mBal(), mCap(type, amt)) : 0; }
+  function lowPoint(bal){ let m = 0; bal.forEach((v,i) => { if (v < bal[m]) m = i; }); return m; }
+
+  /* ---------- document vault ---------- */
+  function docState(rule){
+    const d = S.docs[rule.key];
+    if (!d) return { s: 'missing' };
+    if (d.status === 'rejected') return { s: 'rejected', note: d.note };
+    if (rule.days == null) return { s: 'ok' };
+    const left = rule.days + diff(d.issued);
+    if (left < 0) return { s: 'expired', left };
+    if (left <= SOON) return { s: 'soon', left };
+    return { s: 'ok', left };
+  }
+  function docCheck(amt){
+    const today = iso(today0());
+    const out = { req: DOCS.filter(r => !r.minAmt || amt >= r.minAmt), reuse: [], soon: [], need: [] };
+    out.req.forEach(r => {
+      const st = docState(r), d = S.docs[r.key];
+      if (!S.consent && d && d.issued !== today) { out.need.push({ r, st: { s: 'consent' } }); return; }
+      if (st.s === 'ok') out.reuse.push({ r, st });
+      else if (st.s === 'soon') out.soon.push({ r, st });
+      else out.need.push({ r, st });
+    });
+    out.fresh = out.req.filter(r => S.docs[r.key] && S.docs[r.key].issued === today && S.docs[r.key].status === 'ok').length;
+    return out;
+  }
+  function reason(r, st){
+    if (st.s === 'missing') return r.minAmt ? '이번 신청 금액이 ' + man(r.minAmt) + ' 이상이라 필요합니다' : '등록된 서류가 없습니다';
+    if (st.s === 'expired') return '발급 후 ' + r.days + '일이 지나 만료됐습니다';
+    if (st.s === 'rejected') return '반려: ' + st.note;
+    if (st.s === 'consent') return '보관·재사용 동의가 없어 다시 받아야 합니다';
+    if (st.s === 'soon') return st.left + '일 뒤 만료됩니다. 심사 중 만료될 수 있어 미리 올리기를 권장합니다';
+    return '';
+  }
+  function docTag(st){
+    return { ok: '<span class="tag">유효</span>', soon: '<span class="tag warn">만료 임박</span>', expired: '<span class="tag warn">만료</span>',
+      rejected: '<span class="tag warn">반려</span>', missing: '<span class="tag" style="opacity:.7">미등록</span>' }[st.s];
+  }
+  function renderVault(){
+    document.getElementById('consent').checked = !!S.consent;
+    document.getElementById('docRows').innerHTML = DOCS.map(r => {
+      const d = S.docs[r.key], st = docState(r);
+      const note = st.s === 'rejected' ? '<div class="muted" style="font-size:13px">' + esc(st.note) + '</div>'
+        : (st.s === 'missing' && r.minAmt ? '<div class="muted" style="font-size:13px">' + man(r.minAmt) + ' 이상 신청 시 필요</div>' : '');
+      return '<tr><td>' + esc(r.name) + note + '</td><td>' + (d ? esc(md(d.issued)) : '-') + '</td><td>' + (r.term || (r.days ? '발급 후 ' + r.days + '일' : '없음')) + '</td><td>' + docTag(st) +
+        (st.left != null && st.s !== 'expired' ? '<div class="muted" style="font-size:13px">' + st.left + '일 남음</div>' : '') + '</td><td><button class="small" data-act="upload" data-doc="' + r.key + '">새 서류 올리기</button></td></tr>';
+    }).join('');
+  }
+
+  function renderMileage(){
+    document.getElementById('mBal').textContent = won(mBal());
+    const tag = k => '<span class="tag' + (k === '사용' ? ' warn' : '') + '" style="margin-left:6px">' + k + '</span>';
+    document.getElementById('mRows').innerHTML = S.mileage.slice().reverse().slice(0, 5).map(m =>
+      '<li><span class="when">' + esc(md(m.date)) + '</span><span>' + esc(m.label) + tag(m.kind) + '</span><span class="num ' + (m.amt > 0 ? 'in' : 'out') + '">' + (m.amt > 0 ? '+' : '−') + won(Math.abs(m.amt)) + '</span></li>').join('') ||
+      '<li class="empty">적립 내역이 없습니다.</li>';
+  }
+
+  /* ---------- shortfall callout (home & report) ---------- */
+  function calloutHTML(bal, minD){
+    if (bal[minD] >= 0) return '';
+    const target = S.purchases
+      .filter(p => p.status === 'ordered' && !appFor(p.id) && Math.max(0, diff(p.due)) <= minD)
+      .sort((a,b) => total(b) - total(a))[0];
+    if (target) return '<div class="callout"><p>' + esc(md(target.due)) + ' 결제할 ' + esc(target.party) + ' 대금 ' + man(total(target)) +
+      '을 매출과 묶어 플로우페이로 결제하면, 매출 입금으로 상환해 부족 구간이 사라집니다.</p>' +
+      '<button class="hot" data-act="finance" data-id="' + target.id + '">이 발주를 플로우페이로 결제</button></div>';
+    return '<div class="callout"><p>부족 구간 전에 결제할 발주가 이미 신청 중입니다. 서비스 진행 화면에서 진행 상황을 확인하세요.</p><a class="btn" href="#flowpay">신청 내역 보기</a></div>';
+  }
+
+  /* ---------- HOME ---------- */
+  function renderHome(){
+    const bal = forecast();
+    let minD = 0; bal.forEach((v,i) => { if (v < bal[minD]) minD = i; });
+    const minV = bal[minD];
+    const h = document.getElementById('headline');
+    if (minV < 0){
+      h.innerHTML = esc(when(minD)) + ' 잔고가 <span class="neg num">' + man(minV) + '</span>까지 내려갑니다';
+    } else {
+      h.innerHTML = '앞으로 30일 동안 잔고가 <span class="num">' + man(minV) + '</span> 아래로 내려가지 않습니다';
+    }
+    document.getElementById('subline').textContent = '현재 잔고 ' + man(S.cash) + '. 받을 돈과 줄 돈을 결제일에 맞춰 반영한 예측입니다.';
+    drawChart(bal, minD, 'chart');
+
+    document.getElementById('callout').innerHTML = calloutHTML(bal, minD);
+
+    const ev = events().filter(e => e.day <= 14);
+    const li = e => '<li><span class="when">' + esc(when(e.day)) + '</span><span>' + esc(e.label) + '</span><span class="num ' + e.kind + '">' + (e.amt > 0 ? '+' : '−') + man(Math.abs(e.amt)) + '</span></li>';
+    const ins = ev.filter(e => e.amt > 0), outs = ev.filter(e => e.amt < 0);
+    document.getElementById('inList').innerHTML = ins.length ? ins.map(li).join('') : '<li class="empty">14일 안에 들어올 돈이 없습니다.</li>';
+    document.getElementById('outList').innerHTML = outs.length ? outs.map(li).join('') : '<li class="empty">14일 안에 나갈 돈이 없습니다.</li>';
+
+    const od = overdue(), box = document.getElementById('overdueBox');
+    if (od.length){
+      box.style.display = '';
+      box.innerHTML = '<h2>연체된 받을 돈</h2><p class="muted" style="margin-bottom:8px">예측 그래프에는 넣지 않았습니다. 연체 건은 유동화 대상이 아니며, 매출업무에서 독촉 알림을 보낼 수 있습니다.</p><ul class="rows">' +
+        od.map(s => '<li><span class="when alert">' + esc(when(diff(s.due))) + '</span><span>' + esc(s.party) + ' (' + esc(s.item) + ')</span><span class="num alert">' + man(total(s)) + '</span></li>').join('') +
+        '</ul><p style="margin-top:10px"><a class="btn" href="#sales">매출업무에서 처리</a></p>';
+    } else { box.style.display = 'none'; }
+  }
+
+  function drawChart(bal, minD, svgId){
+    const W = 720, H = 230, L = 64, R = 16, T = 16, B = 30;
+    const lo = Math.min(0, ...bal), hi = Math.max(...bal);
+    const span = (hi - lo) || 1;
+    const x = d => L + (W - L - R) * d / 30;
+    const y = v => T + (H - T - B) * (hi - v) / span;
+    let path = 'M' + x(0) + ' ' + y(bal[0]);
+    for (let d = 1; d <= 30; d++) path += ' H' + x(d).toFixed(1) + ' V' + y(bal[d]).toFixed(1);
+    const cs = getComputedStyle(document.documentElement);
+    const brand = cs.getPropertyValue('--brand').trim(), alert = cs.getPropertyValue('--alert').trim(), line = cs.getPropertyValue('--line').trim();
+    let s = '';
+    [hi, 0, lo].filter((v,i,a) => a.indexOf(v) === i).forEach(v => {
+      s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="' + line + '" ' + (v === 0 ? 'stroke-dasharray="4 4"' : '') + '/>';
+      s += '<text x="' + (L - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + man(v) + '</text>';
+    });
+    if (lo < 0) s += '<rect x="' + L + '" y="' + y(0) + '" width="' + (W - L - R) + '" height="' + (y(lo) - y(0)) + '" fill="' + alert + '" opacity="0.08"/>';
+    [0,7,14,21,28].forEach(d => { s += '<text x="' + x(d) + '" y="' + (H - 8) + '" text-anchor="middle">' + (d === 0 ? '오늘' : d + '일') + '</text>'; });
+    s += '<path d="' + path + '" fill="none" stroke="' + brand + '" stroke-width="2.5" stroke-linejoin="round"/>';
+    if (bal[minD] < 0) s += '<circle cx="' + x(minD) + '" cy="' + y(bal[minD]) + '" r="5" fill="' + alert + '"/>';
+    document.getElementById(svgId).innerHTML = s;
+  }
+
+  /* ---------- REPORT ---------- */
+  function renderReport(){
+    const bal = forecast(), minD = lowPoint(bal), t = today0();
+    const wd = ['일','월','화','수','목','금','토'][t.getDay()];
+    const yd = addDays(-1), td = iso(t);
+    const recent = S.log.filter(l => l.date === yd || l.date === td);
+    const ev7 = events().filter(e => e.day <= 7);
+    const in7 = ev7.filter(e => e.amt > 0).reduce((a,e) => a + e.amt, 0);
+    const out7 = ev7.filter(e => e.amt < 0).reduce((a,e) => a - e.amt, 0);
+    const od = overdue();
+    const noTax = S.sales.filter(s => s.status === 'open' && s.tax !== 'issued');
+    const repay = S.purchases.filter(p => p.status === 'financed' && diff(p.repayDate) <= 30);
+    const row = (w, label, amt, cls) => '<li><span class="when">' + esc(w) + '</span><span>' + esc(label) + '</span><span class="num ' + cls + '">' + (amt > 0 ? '+' : '−') + man(Math.abs(amt)) + '</span></li>';
+    const todo = [];
+    if (od.length) todo.push('연체된 받을 돈 ' + od.length + '건, ' + man(od.reduce((a,s) => a + total(s), 0)) + ' (' + od.map(s => esc(s.party)).join(', ') + ')');
+    if (noTax.length) todo.push('세금계산서를 아직 발행하지 않은 매출 ' + noTax.length + '건, ' + man(noTax.reduce((a,s) => a + total(s), 0)) + '. 발행이 늦으면 입금도 늦어질 수 있습니다');
+    const taxL = S.sales.filter(s => taxLate(s));
+    if (taxL.length) todo.push('세금계산서 발행 기한이 지난 매출 ' + taxL.length + '건 (' + [...new Set(taxL.map(s => esc(s.party)))].join(', ') + '). 플로우스코어가 내려가고 플로우페이 한도가 30% 줄었습니다');
+    S.fav.map(i => FUNDS.find(f => f.id === i)).filter(f => f && f.d <= 7).forEach(f => todo.push('관심 지원사업 마감 임박: ' + esc(f.name) + ' (D-' + f.d + ')'));
+    const pw = partners().filter(p => p.g === 'D' || p.prev - p.v >= 30);
+    if (pw.length) todo.push('거래처 플로우스코어 주의: ' + pw.map(p => esc(p.party) + ' ' + p.v + '점').join(', ') + '. 플로우스코어 화면에서 확인하세요');
+    if (mBal() > 0) todo.push('마일리지 ' + won(mBal()) + '이 쌓여 있습니다. 다음 플로우페이 신청 때 차감할 수 있습니다');
+    repay.forEach(p => todo.push(esc(md(p.repayDate)) + ' 플로우페이 상환 ' + man(p.repayAmount) + ' (' + esc(p.party) + ')'));
+    document.getElementById('reportBody').innerHTML =
+      '<p class="muted">' + esc(S.company) + ' 대표님께 매일 오전 8시에 보내는 보고서입니다</p>' +
+      '<h1>' + (t.getMonth()+1) + '월 ' + t.getDate() + '일 (' + wd + ') 자금일보</h1>' +
+      '<div class="figs"><div><span>오늘 잔고</span><b class="num">' + man(S.cash) + '</b></div><div><span>7일 안에 들어올 돈</span><b class="num in">' + man(in7) + '</b></div><div><span>7일 안에 나갈 돈</span><b class="num out">' + man(out7) + '</b></div></div>' +
+      calloutHTML(bal, minD) +
+      '<h2>30일 자금 예측</h2><p>' + (bal[minD] < 0 ? when(minD) + ' 잔고가 <b class="alert num">' + man(bal[minD]) + '</b>까지 내려갑니다.' : '30일 동안 최저 잔고는 ' + man(bal[minD]) + '입니다.') + ' 30일 뒤 예상 잔고는 ' + man(bal[30]) + '입니다.</p>' +
+      '<div class="chart-box"><svg id="chart2" viewBox="0 0 720 230" width="100%" role="img" aria-label="30일 잔고 예측 그래프"></svg></div>' +
+      '<h2>최근 입출금 (어제와 오늘)</h2><ul class="rows">' + (recent.length ? recent.map(l => row(l.date === td ? '오늘' : '어제', l.label, l.amt, l.amt > 0 ? 'in' : 'out')).join('') : '<li class="empty">어제와 오늘 입출금이 없습니다.</li>') + '</ul>' +
+      '<h2>7일 안의 결제 예정</h2><ul class="rows">' + (ev7.length ? ev7.map(e => row(when(e.day), e.label, e.amt, e.kind)).join('') : '<li class="empty">7일 안에 예정된 입출금이 없습니다.</li>') + '</ul>' +
+      '<h2>오늘 챙길 일</h2>' + (todo.length ? '<ul class="todo">' + todo.map(x => '<li>' + x + '</li>').join('') + '</ul>' : '<p class="empty">챙길 일이 없습니다.</p>') +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:22px"><button class="primary" data-act="sendReport">대표에게 보내기 (테스트)</button><a class="btn" href="#sales">매출업무 열기</a></div>';
+    drawChart(bal, minD, 'chart2');
+  }
+
+  /* ---------- ORDERS ---------- */
+  function linkNames(ids){ return ids.map(i => { const x = S.sales.find(y => y.id === i); return x ? x.party : ''; }).filter(Boolean).join(', '); }
+  function renderOrders(){
+    const rows = S.purchases.slice().sort((a,b) => a.due < b.due ? -1 : 1).map(p => {
+      const app = appFor(p.id);
+      let st, acts = '';
+      if (p.status === 'paid') st = '<span class="tag">지급 완료</span>' + (p.paidOn && p.paidOn > p.due ? '<div class="muted" style="font-size:13px">' + between(p.due, p.paidOn) + '일 늦게 지급</div>' : '');
+      else if (p.status === 'repaid') st = '<span class="tag">플로우페이 상환 완료</span>';
+      else if (p.status === 'financed' && p.repayLate) st = '<span class="tag warn">플로우페이 상환 연체</span>';
+      else if (p.status === 'financed') st = '<span class="tag">플로우페이 결제</span>' + (p.links ? '<div class="muted" style="font-size:13px">매출 ' + esc(linkNames(p.links)) + ' 입금으로 상환' + (p.remain > 0 ? ', 부족분 ' + man(p.remain) + ' ' + esc(md(p.repayDate)) : '') + '</div>' : '<div class="muted" style="font-size:13px">상환 ' + esc(md(p.repayDate)) + ', ' + man(p.repayAmount) + '</div>');
+      else if (app) st = '<span class="tag warn">플로우페이 묶음 신청 중</span>' + (app.links ? '<div class="muted" style="font-size:13px">매출 ' + esc(linkNames(app.links)) + '</div>' : '');
+      else st = '<span class="tag warn">결제 예정</span>';
+      if (p.status === 'ordered'){
+        acts += '<button class="small" data-act="pay" data-id="' + p.id + '">지급 완료</button>';
+        if (!app) acts += '<button class="small" data-act="finance" data-id="' + p.id + '">플로우페이로 결제</button>';
+      }
+      return '<tr><td>' + esc(md(p.due)) + '<div class="muted" style="font-size:13px">' + esc(when(diff(p.due))) + '</div></td><td>' + esc(p.party) + '</td><td>' + esc(p.item) + ' ' + p.qty.toLocaleString('ko-KR') + '개</td><td class="r num">' + man(total(p)) + '</td><td>' + st + '</td><td><div class="acts">' + acts + '</div></td></tr>';
+    });
+    document.getElementById('orderRows').innerHTML = rows.join('') || '<tr><td colspan="6" class="empty">보낸 발주서가 없습니다. 위에서 첫 발주서를 보내 보세요.</td></tr>';
+  }
+
+  /* ---------- SALES ---------- */
+  function renderSales(){
+    const rows = S.sales.slice().sort((a,b) => a.due < b.due ? -1 : 1).map(s => {
+      const app = appFor(s.id), d = diff(s.due);
+      let st, acts = '<button class="small" data-act="stmt" data-id="' + s.id + '">명세서 보기</button>';
+      if (s.status === 'paid') st = '<span class="tag">입금 완료</span>';
+      else if (s.status === 'factored') st = '<span class="tag">유동화 완료</span>';
+      else if (s.status === 'bundled'){ const bp = S.purchases.find(x => x.id === s.bundleOf); st = '<span class="tag">플로우페이 묶음 정산</span><div class="muted" style="font-size:13px">매입 ' + esc(bp ? bp.party : '') + ' 상환에 ' + man(s.alloc) + ' 사용</div>'; }
+      else if (app) st = app.type === 'ar' ? '<span class="tag warn">유동화 신청 중</span>' : '<span class="tag warn">플로우페이 묶음 신청 중</span><div class="muted" style="font-size:13px">매입 ' + esc((S.purchases.find(x => x.id === app.refId) || {}).party || '') + '과 함께</div>';
+      else st = d < 0 ? '<span class="tag warn">연체 ' + (-d) + '일</span>' : '<span class="tag">입금 대기</span>';
+      if (s.tax === 'issued'){ if (s.status === 'open') st += '<div class="muted" style="font-size:13px">세금계산서 발행</div>'; }
+      else {
+        st += '<div style="font-size:13px" class="' + (taxLate(s) ? 'alert' : 'muted') + '">세금계산서 미발행 · 기한 ' + esc(md(taxDue(s))) + '</div>';
+        if (taxLate(s)) st += '<div style="margin-top:4px"><span class="tag warn">발행 기한 경과</span></div>';
+        if (s.confirm === 'confirmed') st += '<div class="muted" style="font-size:13px">거래 상대 확인 완료</div>';
+        else if (s.confirm === 'sent') st += '<div class="muted" style="font-size:13px">거래 상대 확인 대기</div>';
+      }
+      if (s.status === 'open' && !app && s.tax !== 'issued') st += '<div style="margin-top:4px"><span class="tag">플로우페이 신청 가능</span></div>';
+      if (s.status === 'open' && !app && s.tax === 'issued' && d >= 0) st += '<div style="margin-top:4px"><span class="tag" style="background:var(--warn-soft);color:var(--warn)">유동화 신청 가능</span></div>';
+      if (s.reminded && s.status === 'open') st += '<div class="muted" style="font-size:13px">독촉 알림 ' + s.reminded + '회</div>';
+      if (s.status === 'paid' && s.tax !== 'issued') acts += '<button class="small" data-act="tax" data-id="' + s.id + '">세금계산서 발행</button>';
+      if (s.status === 'open'){
+        if (s.tax !== 'issued' && !app) acts += '<button class="small" data-act="tax" data-id="' + s.id + '">세금계산서 발행</button>';
+        acts += '<button class="small" data-act="paid" data-id="' + s.id + '">입금 확인</button>';
+        if (d < 0) acts += '<button class="small" data-act="remind" data-id="' + s.id + '">독촉 알림</button>';
+        if (!app && s.tax !== 'issued') acts += '<button class="small primary" data-act="fpSale" data-id="' + s.id + '">플로우페이 신청</button>';
+        if (!app && s.tax === 'issued' && d >= 0) acts += '<button class="small" data-act="factor" data-id="' + s.id + '">유동화 신청</button>';
+      }
+      return '<tr><td>' + esc(md(s.due)) + '<div class="muted" style="font-size:13px">' + esc(when(d)) + '</div></td><td>' + esc(s.party) + '</td><td>' + esc(s.item) + ' ' + s.qty.toLocaleString('ko-KR') + '개</td><td class="r num">' + man(total(s)) + '</td><td>' + st + '</td><td><div class="acts">' + acts + '</div></td></tr>';
+    });
+    document.getElementById('saleRows').innerHTML = rows.join('') || '<tr><td colspan="6" class="empty">발행한 명세서가 없습니다. 위에서 첫 명세서를 발행해 보세요.</td></tr>';
+  }
+
+  /* ---------- PARTNER FLOWSCORE ---------- */
+  function hsh(str){ let h = 7; for (const c of str) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+  function grade(v){ return v >= 800 ? 'A' : v >= 700 ? 'B' : v >= 600 ? 'C' : 'D'; }
+  const GRADE_NAME = { A: '우량', B: '양호', C: '보통', D: '주의' };
+  /* 규칙 기반 산식: 기본 점수 + 항목별 가감점. 모든 값은 테스트용 가정값 */
+  const BASE = { sale: 640, buy: 640, me: 660 };
+  function todayIso(){ return iso(today0()); }
+  function between(a, b){ return Math.round((parse(b) - parse(a)) / 86400000); }
+  function startOf(x){ return x.issued || x.ordered || x.due; }
+  // 기준일(asOf)에서 본 거래 상태: 그때 이미 있던 거래인지, 입금·지급됐는지, 며칠 늦었는지
+  function stAt(x, asOf){
+    if (startOf(x) > asOf) return null;
+    if (x.paidOn && x.paidOn <= asOf) return { paid: true, late: Math.max(0, between(x.due, x.paidOn)), od: 0 };
+    return { paid: false, late: 0, od: x.due < asOf ? between(x.due, asOf) : 0 };
+  }
+  function F(label, pts, detail){ return { label, pts: Math.round(pts), detail }; }
+  function monthsOf(xs, asOf){ const first = xs.map(startOf).sort()[0]; return first ? Math.max(0, between(first, asOf)) / 30 : 0; }
+  function clampScore(base, f){ return Math.max(300, Math.min(900, Math.round(base + f.reduce((a,x) => a + x.pts, 0)))); }
+  function top3(f){ return f.filter(x => x.pts !== 0).sort((a,b) => Math.abs(b.pts) - Math.abs(a.pts)).slice(0, 3); }
+  function avg(a){ return a.length ? a.reduce((s,v) => s + v, 0) / a.length : 0; }
+  function taxDue(s){ const d = parse(s.issued); return iso(new Date(d.getFullYear(), d.getMonth() + 1, 10)); }
+  function taxIssuedAt(s, asOf){ return s.tax === 'issued' && (s.taxOn || s.issued) <= asOf; }
+  function taxLate(s, asOf){ asOf = asOf || todayIso(); return !taxIssuedAt(s, asOf) && taxDue(s) < asOf; }
+
+  function partnerFactors(role, trades, asOf){
+    const live = trades.map(x => ({ x, s: stAt(x, asOf) })).filter(t => t.s), f = [];
+    const m = monthsOf(live.map(t => t.x), asOf);
+    f.push(F('거래 기간', Math.min(m, 12) * 5, '첫 거래 후 ' + m.toFixed(1) + '개월'));
+    f.push(F('거래 건수', Math.min(live.length, 20) * 3, live.length + '건'));
+    if (role === 'sale'){
+      const paid = live.filter(t => t.s.paid), late = avg(paid.map(t => t.s.late));
+      f.push(F('입금 지연', -Math.min(120, late * 5), paid.length ? '입금 ' + paid.length + '건, 평균 ' + late.toFixed(1) + '일 늦음' : '입금 이력 없음'));
+      const od = live.filter(t => !t.s.paid && t.s.od > 0), maxOd = od.reduce((a,t) => Math.max(a, t.s.od), 0);
+      f.push(F('연체 중', -(od.length * 60 + maxOd * 2), od.length ? od.length + '건, 최대 ' + maxOd + '일' : '없음'));
+      const arLate = trades.filter(x => x.arLate && x.arLate <= asOf).length;
+      if (arLate) f.push(F('유동화 채권 연체', -arLate * 120, arLate + '건'));
+    } else {
+      const amt = live.reduce((a,t) => a + total(t.x), 0);
+      f.push(F('거래 규모', Math.min(60, amt / 1000000 * 2), man(amt)));
+    }
+    return f;
+  }
+  function myFactors(asOf){
+    const sales = S.sales.map(x => ({ x, s: stAt(x, asOf) })).filter(t => t.s);
+    const buys = S.purchases.map(x => ({ x, s: stAt(x, asOf) })).filter(t => t.s), f = [];
+    const all = sales.concat(buys), m = monthsOf(all.map(t => t.x), asOf);
+    f.push(F('거래 기간', Math.min(m, 12) * 5, '첫 거래 후 ' + m.toFixed(1) + '개월'));
+    f.push(F('거래 건수', Math.min(all.length, 30) * 2, all.length + '건'));
+    const bp = buys.filter(t => t.s.paid), bl = avg(bp.map(t => t.s.late));
+    f.push(F('매입 대금 지급 지연', -Math.min(80, bl * 6), bp.length ? '지급 ' + bp.length + '건, 평균 ' + bl.toFixed(1) + '일 늦음' : '지급 이력 없음'));
+    const od = sales.filter(t => !t.s.paid && t.s.od > 0 && t.x.status === 'open');
+    f.push(F('받을 돈 연체', -od.length * 25, od.length ? od.length + '건' : '없음'));
+    const noTax = sales.filter(t => !taxIssuedAt(t.x, asOf)), late = noTax.filter(t => taxLate(t.x, asOf));
+    f.push(F('세금계산서 발행 기한 경과', -late.length * 40, late.length ? late.length + '건 (미발행 ' + noTax.length + '건 중)' : '없음'));
+    const by = {}; let tot = 0;
+    sales.filter(t => between(startOf(t.x), asOf) <= 90).forEach(t => { by[t.x.party] = (by[t.x.party] || 0) + total(t.x); tot += total(t.x); });
+    const topP = Object.keys(by).sort((a,b) => by[b] - by[a])[0], share = tot ? by[topP] / tot : 0;
+    f.push(F('매출처 집중', share > 0.4 ? -(share - 0.4) * 200 : 0, topP ? '최대 ' + topP + ' ' + Math.round(share * 100) + '% (최근 90일)' : '매출 없음'));
+    const outs = S.apps.filter(a => a.outcome && a.outDate <= asOf);
+    const ok = outs.filter(a => a.outcome === 'repaid').length, bad = outs.filter(a => a.outcome === 'late').length;
+    f.push(F('플로우페이 상환 이력', ok * 25 - bad * 120, outs.length ? '상환 ' + ok + '건, 연체 ' + bad + '건' : '이력 없음'));
+    return f;
+  }
+  function histOf(fn){
+    const t = today0(), out = [];
+    for (let k = 5; k >= 1; k--){ const v = fn(iso(new Date(t.getFullYear(), t.getMonth() - k + 1, 0))); if (v != null) out.push(v); }
+    out.push(fn(todayIso()));
+    return out.length > 1 ? out : [out[0], out[0]];
+  }
+  function myScore(){
+    const f = myFactors(todayIso()), v = clampScore(BASE.me, f);
+    const hist = histOf(d => S.sales.concat(S.purchases).some(x => startOf(x) <= d) ? clampScore(BASE.me, myFactors(d)) : null);
+    return { v, f, why: top3(f), hist, prev: hist[hist.length - 2] };
+  }
+  function limitInfo(){
+    const v = myScore().v, late = S.sales.filter(s => taxLate(s)).length;
+    let lim = Math.max(0, v - 500) * 400000;
+    if (late) lim = Math.round(lim * 0.7);
+    return { v, lim, late };
+  }
+  function partners(){
+    const map = {}, asOf = todayIso();
+    const add = (role, party) => map[role + ':' + party] = map[role + ':' + party] || { role, party, trades: [], };
+    S.sales.forEach(x => add('sale', x.party).trades.push(x));
+    S.purchases.forEach(x => add('buy', x.party).trades.push(x));
+    return Object.values(map).map(pt => {
+      const f = partnerFactors(pt.role, pt.trades, asOf), v = clampScore(BASE[pt.role], f);
+      const hist = histOf(d => { const ts = pt.trades.filter(x => startOf(x) <= d); return ts.length ? clampScore(BASE[pt.role], partnerFactors(pt.role, ts, d)) : null; });
+      const prev = hist[hist.length - 2];
+      const amount = pt.trades.reduce((a,x) => a + total(x), 0);
+      const od = pt.role === 'sale' ? pt.trades.filter(x => x.status === 'open' && diff(x.due) < 0) : [];
+      const maxOd = od.reduce((m,x) => Math.max(m, -diff(x.due)), 0);
+      const sig = [];
+      if (od.length) sig.push('연체 ' + od.length + '건 (최대 ' + maxOd + '일)');
+      const lateF = f.find(x => x.label === '입금 지연');
+      if (lateF && lateF.pts <= -35) sig.push('입금 지연 반복');
+      if (prev - v >= 30) sig.push('점수 하락');
+      return { ...pt, v, prev, hist, f, why: top3(f), amount, od, maxOd, sig, g: grade(v), last: pt.trades.map(x => x.due).sort().pop() };
+    }).sort((a,b) => a.v - b.v);
+  }
+  function keyOf(p){ return (p.role === 'sale' ? '매출처 ' : '매입처 ') + p.party; }
+  function scoreMap(){ const m = { '우리 회사': myScore().v }; partners().forEach(p => { m[keyOf(p)] = p.v; }); return m; }
+  // 사건 전후 점수를 비교해 바뀐 점수만 기록
+  function logScores(pre, why){
+    const post = scoreMap(), date = todayIso();
+    Object.keys(post).forEach(k => {
+      if (pre[k] == null) S.scoreLog.push({ date, target: k, before: null, after: post[k], why: why + ' (새 거래처 점수 생성)' });
+      else if (pre[k] !== post[k]) S.scoreLog.push({ date, target: k, before: pre[k], after: post[k], why });
+    });
+  }
+  function ptsHTML(n){ return '<span class="pts ' + (n > 0 ? 'up' : n < 0 ? 'down' : 'muted') + '">' + (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n) + '점</span>'; }
+  function whyHTML(why){ return why.length ? '<ul class="why">' + why.map(x => '<li><span>' + esc(x.label) + ' <span class="muted">' + esc(x.detail) + '</span></span>' + ptsHTML(x.pts) + '</li>').join('') + '</ul>' : '<p class="muted" style="font-size:14px">아직 반영할 거래 기록이 없습니다.</p>'; }
+  function factorTable(base, f, v){
+    return '<div class="tbl mini" style="margin-top:6px"><table style="min-width:0"><thead><tr><th>항목</th><th>근거</th><th class="r">점수</th></tr></thead><tbody>' +
+      '<tr><td>기본 점수</td><td class="muted">모든 기업 공통</td><td class="r num">' + base + '</td></tr>' +
+      f.map(x => '<tr><td>' + esc(x.label) + '</td><td class="muted">' + esc(x.detail) + '</td><td class="r">' + ptsHTML(x.pts) + '</td></tr>').join('') +
+      '<tr><td><b>합계</b></td><td class="muted">300~900점 범위로 제한</td><td class="r num"><b>' + v + '</b></td></tr></tbody></table></div>';
+  }
+  function logHTML(rows){
+    return rows.length ? '<ul class="rows">' + rows.map(l => '<li style="grid-template-columns:72px 1fr auto"><span class="when">' + esc(md(l.date)) + '</span><span><b>' + esc(l.target) + '</b> <span class="muted" style="font-size:13px">' + esc(l.why) + '</span></span><span class="num">' +
+      (l.before == null ? l.after : l.before + ' → ' + l.after + ' ' + ptsHTML(l.after - l.before)) + '</span></li>').join('') + '</ul>'
+      : '<p class="empty">아직 기록이 없습니다. 예를 들어 매출업무에서 브라이트몰 연체 건을 입금 확인하거나, 한결푸드 매출의 세금계산서를 발행해 보세요.</p>';
+  }
+  function deltaHTML(p){ const d = p.v - p.prev; return d === 0 ? '<span class="muted">변동 없음</span>' : '<span class="num ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '▲' : '▼') + Math.abs(d) + '</span>'; }
+  function renderScore(){
+    const t = today0(), ps = partners();
+    document.getElementById('scMeta').textContent = '매월 1일 대표님께 발송, ' + (t.getMonth()+1) + '월 1일 발행';
+    document.getElementById('scTitle').textContent = (t.getMonth()+1) + '월 거래처 플로우스코어 리포트';
+    const avg = ps.length ? Math.round(ps.reduce((a,p) => a + p.v, 0) / ps.length) : 0;
+    const warn = ps.filter(p => p.g === 'D'), drop = ps.filter(p => p.prev - p.v >= 30);
+    document.getElementById('scFigs').innerHTML = '<div><span>거래처</span><b class="num">' + ps.length + '곳</b></div><div><span>평균 스코어</span><b class="num">' + avg + '</b></div><div><span>주의 등급</span><b class="num' + (warn.length ? ' alert' : '') + '">' + warn.length + '곳</b></div><div><span>지난달보다 하락</span><b class="num' + (drop.length ? ' alert' : '') + '">' + drop.length + '곳</b></div>';
+    const row = p => '<tr class="click" data-act="scOpen" data-role="' + p.role + '" data-party="' + esc(p.party) + '"><td><b>' + esc(p.party) + '</b></td><td><span class="num" style="font-weight:600">' + p.v + '</span> <span class="gr gr-' + p.g + '">' + p.g + '</span></td><td>' + deltaHTML(p) + '</td><td class="r num">' + man(p.amount) + '</td><td>' + (p.sig.length ? '<span class="tag warn">' + esc(p.sig.join(', ')) + '</span>' : '<span class="muted">특이사항 없음</span>') + '</td><td><button class="small" data-act="scOpen" data-role="' + p.role + '" data-party="' + esc(p.party) + '">정보 보기</button></td></tr>';
+    const empty = '<tr><td colspan="6" class="empty">거래처가 없습니다.</td></tr>';
+    const ss = ps.filter(p => p.role === 'sale'), bs = ps.filter(p => p.role === 'buy');
+    document.getElementById('scSales').innerHTML = ss.length ? ss.map(row).join('') : empty;
+    document.getElementById('scBuys').innerHTML = bs.length ? bs.map(row).join('') : empty;
+    const rq = S.reqs.slice().reverse();
+    document.getElementById('scReqs').innerHTML = rq.length ? '<ul class="rows">' + rq.map(r => '<li style="grid-template-columns:90px 1fr auto"><span class="when">' + esc(md(r.date)) + '</span><span><b>' + esc(r.party) + '</b> <span class="muted" style="font-size:13px">' + esc(r.items.join(', ')) + '</span><small style="display:block;color:var(--muted);font-size:12px">' + esc(r.method === 'consent' ? '동의 요청 링크 발송 (' + r.contact + ')' : '공개 정보 조회') + ', ' + esc(r.reason) + '</small></span>' +
+      (r.status === 'pending' ? '<span style="display:flex;gap:6px;align-items:center"><span class="tag warn">동의 대기</span><button class="small" data-act="scAgree" data-id="' + r.id + '">상대방 동의 (테스트)</button></span>' : '<span class="tag">리포트 도착</span>') + '</li>').join('') + '</ul>' : '<p class="empty">아직 정보 요청 내역이 없습니다.</p>';
+    document.getElementById('scLog').innerHTML = logHTML(S.scoreLog.slice(-15).reverse());
+  }
+  function sparkSVG(hist){
+    const W = 480, H = 120, L = 36, R = 12, T = 14, B = 24, lo = Math.min(...hist) - 20, hi = Math.max(...hist) + 20;
+    const x = i => L + (W - L - R) * i / (hist.length - 1), y = v => T + (H - T - B) * (hi - v) / (hi - lo);
+    const t = today0(); const mon = i => { const d = new Date(t.getFullYear(), t.getMonth() - (hist.length - 1 - i), 1); return (d.getMonth()+1) + '월'; };
+    const cs = getComputedStyle(document.documentElement), brand = cs.getPropertyValue('--brand').trim();
+    let s = '<polyline fill="none" stroke="' + brand + '" stroke-width="2.5" stroke-linejoin="round" points="' + hist.map((v,i) => x(i) + ',' + y(v)).join(' ') + '"/>';
+    hist.forEach((v,i) => { s += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="' + (i === hist.length - 1 ? 4.5 : 3) + '" fill="' + brand + '"/><text x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="middle">' + mon(i) + '</text>'; });
+    s += '<text x="' + x(hist.length - 1) + '" y="' + (y(hist[hist.length-1]) - 9) + '" text-anchor="middle" style="font-weight:600">' + hist[hist.length-1] + '</text>';
+    return '<svg class="spark" viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="최근 6개월 플로우스코어 추이">' + s + '</svg>';
+  }
+  function openScore(role, party){
+    const p = partners().find(x => x.role === role && x.party === party); if (!p) return;
+    const items = ['기업 개요와 재무 요약', '신용등급과 연체 이력', '휴·폐업과 세금 체납 여부', '소송·압류 등 공공 정보'];
+    openDlg('<h2>' + esc(p.party) + ' 플로우스코어</h2>' +
+      '<div class="score" style="margin-bottom:4px"><b class="num">' + p.v + '</b><span class="gr gr-' + p.g + '">' + p.g + ' ' + GRADE_NAME[p.g] + '</span><span>' + deltaHTML(p) + '</span></div>' +
+      '<p class="muted" style="font-size:13px">' + (role === 'sale' ? '매출처' : '매입처') + ', 최근 6개월 추이</p>' + sparkSVG(p.hist) +
+      '<dl class="kv" style="margin-top:10px"><dt>거래 건수</dt><dd>' + p.trades.length + '건</dd><dt>거래 금액</dt><dd class="num">' + won(p.amount) + '</dd>' +
+      (role === 'sale' ? '<dt>연체</dt><dd>' + (p.od.length ? '<span class="alert">' + p.od.length + '건, 최대 ' + p.maxOd + '일</span>' : '없음') + '</dd>' : '') +
+      '<dt>최근 거래</dt><dd>' + (p.last ? esc(md(p.last)) : '-') + '</dd><dt>신호</dt><dd>' + (p.sig.length ? esc(p.sig.join(', ')) : '특이사항 없음') + '</dd></dl>' +
+      '<p class="step-h">점수 주요 이유</p>' + whyHTML(p.why) +
+      '<details><summary>산식 전체 보기</summary>' + factorTable(BASE[p.role], p.f, p.v) + '</details>' +
+      '<p class="step-h">추가 정보 요청</p><p class="muted" style="font-size:14px">더 자세한 신용 정보는 상대 기업의 동의를 받아 요청합니다. 필요한 항목을 고르세요.</p>' +
+      '<div class="opt">' + items.map((it,i) => '<label class="check"><input type="checkbox" name="rqi" value="' + it + '"' + (i < 2 ? ' checked' : '') + '> ' + it + '</label>').join('') + '</div>' +
+      '<p class="step-h" style="font-size:14px">요청 방식</p><div class="opt">' +
+      '<label class="check"><input type="radio" name="rqm" value="consent" checked> 상대 기업에 동의 요청 링크 보내기 (알림톡·문자·이메일)</label>' +
+      '<label class="check"><input type="radio" name="rqm" value="public"> 동의 없이 공개 정보만 조회 (휴·폐업, 공공 정보)</label></div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px">' +
+      '<label>상대 담당자 연락처<input id="rqc" placeholder="휴대폰 번호 또는 이메일"></label>' +
+      '<label>요청 사유<select id="rqr"><option>신규 거래 전 확인</option><option>결제 조건 결정</option><option>플로우페이·유동화 신청 검토</option><option>연체 대응</option></select></label></div>' +
+      '<div class="foot"><button type="button" data-act="close">닫기</button><button class="primary" type="button" data-act="scReq" data-role="' + role + '" data-party="' + esc(p.party) + '">정보 요청하기</button></div>');
+  }
+
+  /* ---------- COMPANY REPORT ---------- */
+  let curCo = null;
+  function coInfo(p){
+    const h = hsh(p.party), pick = (arr, k) => arr[(h >>> k) % arr.length];
+    const ceo = pick(['김도윤','이서연','박지호','최하은','정민준','한유진'], 1);
+    const item = (p.trades[0] || {}).item || '';
+    const ind = p.role === 'sale' ? '(G46) 도매 및 상품 중개업' : (item.indexOf('원단') >= 0 ? '(C13) 섬유제품 제조업' : item.indexOf('포장') >= 0 || item.indexOf('박스') >= 0 ? '(C17) 펄프·종이 제품 제조업' : '(C10) 식료품 제조업');
+    const biz = String(100 + h % 900) + '-' + String(10 + (h >>> 3) % 90) + '-' + String(10000 + (h >>> 7) % 90000);
+    const year = 2010 + (h >>> 2) % 12;
+    const rev25 = 1800000 + (h % 7000) * 1000, g24 = 0.8 + ((h >>> 4) % 40) / 100, g23 = 0.6 + ((h >>> 6) % 45) / 100;
+    const rev = [Math.round(rev25 * g24 * g23), Math.round(rev25 * g24), rev25];
+    const mg = [0.04 + ((h >>> 8) % 6) / 100, 0.05 + ((h >>> 9) % 6) / 100, p.od.length ? 0.01 : 0.02 + ((h >>> 10) % 6) / 100];
+    const op = rev.map((r,i) => Math.round(r * mg[i])), ni = op.map(o => Math.round(o * 0.82));
+    const cap = (h % 2) ? 200000 : 100000;
+    const eq = []; let e = cap + Math.round(rev[0] * 0.08); ni.forEach(n => { e += n; eq.push(e); });
+    const debtR = 0.45 + ((h >>> 11) % 30) / 100 + (p.od.length ? 0.15 : 0);
+    const liab = eq.map(x => Math.round(x * debtR / (1 - debtR))), assets = eq.map((x,i) => x + liab[i]);
+    const notch = ['A-','BBB+','BBB','BBB-','BB+','BB','BB-','B+'];
+    const gi = p.v >= 800 ? 0 : p.v >= 760 ? 1 : p.v >= 720 ? 2 : p.v >= 690 ? 3 : p.v >= 660 ? 4 : p.v >= 630 ? 5 : p.v >= 600 ? 6 : 7;
+    const t = today0();
+    const hist = [[notch[gi], iso(new Date(t.getFullYear(), t.getMonth() - 4, 2)), (t.getFullYear() - 1) + '-12-31', '조사등급'],
+      [notch[Math.min(7, gi + (p.od.length ? -1 : 1) < 0 ? 0 : gi + (p.od.length ? -1 : 1))], iso(new Date(t.getFullYear() - 1, t.getMonth() - 3, 19)), (t.getFullYear() - 2) + '-12-31', '모형등급'],
+      [notch[Math.min(7, gi + 2)], iso(new Date(t.getFullYear() - 2, t.getMonth() - 5, 28)), (t.getFullYear() - 3) + '-12-31', '모형등급']];
+    const gdesc = gi <= 3 ? '채무상환능력이 양호하나, 경제 여건이 크게 나빠지면 상환능력이 낮아질 수 있음' : '채무상환능력은 인정되나, 경제 여건과 시장 환경 변화에 따라 안정성이 다소 불안한 요소가 있음';
+    const cf = p.v >= 760 ? '양호' : p.v >= 680 ? '보통이상' : '보통';
+    const emp = []; let n = 8 + h % 25; for (let k = 4; k >= 0; k--){ const d = new Date(t.getFullYear(), t.getMonth() - 1 - k, 1); emp.push([d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'), n + (((h >>> k) % 3) - 1)]); }
+    const s1 = 70 + h % 25, s2 = Math.round((100 - s1) * 0.6);
+    return { ceo, ind, biz, founded: year + '-' + String(1 + (h >>> 5) % 12).padStart(2,'0') + '-' + String(1 + (h >>> 6) % 27).padStart(2,'0'),
+      size: rev25 > 5000000 ? '중기업' : '소기업', addr: pick(['서울 성동구','경기 용인시','인천 남동구','경기 화성시','부산 사상구','경기 김포시'], 3),
+      product: p.role === 'sale' ? '생활용품·식품 유통' : item, rev, op, ni, cap, eq, liab, assets, grade: notch[gi], gdesc, hist, cf,
+      ew: p.od.length ? '관찰' : '정상', emp, holders: [[ceo, s1], ['특수관계인', s2], ['기타', 100 - s1 - s2]] };
+  }
+  const k1 = n => Math.round(n).toLocaleString('ko-KR');
+  function lockWrap(open, html, party){
+    return open ? html : '<div class="locked"><div class="blur">' + html + '</div><div class="lockmsg"><p>상대 기업이 정보 제공에 동의하면 열람할 수 있습니다.</p><button class="small primary" data-act="scReqOpen" data-role="' + curCo.role + '" data-party="' + esc(party) + '">정보 요청하기</button></div></div>';
+  }
+  function renderCompany(){
+    const box = document.getElementById('coBody');
+    if (!curCo){ box.innerHTML = ''; return; }
+    const p = partners().find(x => x.role === curCo.role && x.party === curCo.party);
+    if (!p){ box.innerHTML = '<div class="panel"><p class="empty">거래처 정보를 찾을 수 없습니다.</p></div>'; return; }
+    const c = coInfo(p), open = S.reqs.some(r => r.party === p.party && r.status === 'done');
+    const pending = S.reqs.some(r => r.party === p.party && r.status === 'pending');
+    const yrs = [0,1,2].map(i => (today0().getFullYear() - 3 + i));
+    const fin = (rows) => '<div class="tbl mini" style="margin-top:0"><table><thead><tr><th>구분</th>' + yrs.map(y => '<th class="r">' + y + '</th>').join('') + '</tr></thead><tbody>' + rows.map(r => '<tr><td>' + r[0] + '</td>' + r[1].map(v => '<td class="r num">' + k1(v) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+    const gradeBox = '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><span class="cgrade">' + c.grade + '</span><div><div><span class="tag">현금흐름 ' + c.cf + '</span> <span class="tag' + (c.ew === '관찰' ? ' warn' : '') + '">조기경보 ' + c.ew + '</span></div><p class="muted" style="font-size:13px;margin-top:6px;max-width:44ch">' + c.gdesc + '</p></div></div>' +
+      '<div class="tbl mini"><table><thead><tr><th>등급</th><th>평가일자</th><th>재무기준일자</th><th>등급구분</th></tr></thead><tbody>' + c.hist.map(r => '<tr><td><b>' + r[0] + '</b></td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td></tr>').join('') + '</tbody></table></div>';
+    const credit = '<dl class="kv" style="grid-template-columns:150px 1fr;margin:0"><dt>상거래 연체정보</dt><dd>' + (p.od.length ? '<span class="alert">자사 거래 연체 ' + p.od.length + '건 (최대 ' + p.maxOd + '일)</span>' : '-') + '</dd><dt>당좌거래 정지 이력</dt><dd>-</dd><dt>회생절차·워크아웃</dt><dd>-</dd><dt>당좌개설·카드발급</dt><dd>' + (2 + hsh(p.party) % 6) + '건</dd></dl>';
+    const holders = '<div class="tbl mini" style="margin-top:0"><table style="min-width:0"><thead><tr><th>주주</th><th class="r">지분율</th></tr></thead><tbody>' + c.holders.map(x => '<tr><td>' + esc(x[0]) + '</td><td class="r num">' + x[1] + '%</td></tr>').join('') + '</tbody></table></div>';
+    const emp = '<div class="tbl mini" style="margin-top:0"><table style="min-width:0"><thead><tr>' + c.emp.map(e => '<th class="r">' + e[0] + '</th>').join('') + '</tr></thead><tbody><tr>' + c.emp.map(e => '<td class="r num">' + e[1] + '명</td>').join('') + '</tr></tbody></table></div>';
+    box.innerHTML =
+      '<a class="backlink" href="#score">플로우스코어로 돌아가기</a>' +
+      '<div class="panel"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start"><div>' +
+        '<p class="muted">' + (p.role === 'sale' ? '매출처' : '매입처') + ' 기업평가 리포트, 기준일 ' + esc(md(iso(today0()))) + '</p><h1>' + esc(p.party) + '</h1>' +
+        '<p class="muted">' + c.biz + '  |  대표 ' + esc(c.ceo) + '</p></div>' +
+        '<div style="text-align:right"><div class="score" style="justify-content:flex-end"><b class="num">' + p.v + '</b><span class="gr gr-' + p.g + '">' + p.g + ' ' + GRADE_NAME[p.g] + '</span></div><p style="margin-top:4px">' + deltaHTML(p) + ' <span class="muted" style="font-size:13px">플로우스코어</span></p></div></div>' +
+        (open ? '<p class="sum" style="margin-top:14px">상대 기업의 동의로 신용정보 전체를 열람하고 있습니다.</p>' : '<p class="sum" style="margin-top:14px;background:var(--warn-soft)">' + (pending ? '동의 요청을 보냈습니다. 상대 기업이 동의하면 신용등급과 재무 정보가 열립니다.' : '공개 정보와 우리 회사 거래 데이터만 보여줍니다. 신용등급과 재무 정보는 상대 기업 동의 후 열람할 수 있습니다.') + '</p>') +
+        '<p class="step-h">플로우스코어 주요 이유</p>' + whyHTML(p.why) +
+        '<details><summary>산식 전체 보기</summary>' + factorTable(BASE[p.role], p.f, p.v) + '</details>' +
+        '<p class="muted" style="font-size:12px;margin-top:10px">참고 지표이며 신용평가가 아닙니다. <a href="#" data-act="dispute" data-target="' + esc(keyOf(p)) + '" style="color:var(--brand)">점수 이의 제기</a></p>' +
+      '</div>' +
+      '<div class="grid2">' +
+        '<div class="panel"><h2>기업 프로필</h2><dl class="kv" style="margin:0"><dt>사업자번호</dt><dd>' + c.biz + '</dd><dt>대표자</dt><dd>' + esc(c.ceo) + '</dd><dt>업종</dt><dd>' + c.ind + '</dd><dt>설립일자</dt><dd>' + c.founded + '</dd><dt>기업규모</dt><dd>' + c.size + '</dd><dt>소재지</dt><dd>' + c.addr + '</dd><dt>주요 제품</dt><dd>' + esc(c.product) + '</dd><dt>휴폐업</dt><dd><span class="tag">정상</span></dd><dt>법인등기</dt><dd><span class="tag">정상</span></dd></dl></div>' +
+        '<div class="panel"><h2>기업신용등급</h2>' + lockWrap(open, gradeBox, p.party) + '</div>' +
+      '</div>' +
+      '<div class="grid2">' +
+        '<div class="panel"><h2>신용정보 요약</h2>' + lockWrap(open, credit, p.party) + '</div>' +
+        '<div class="panel"><h2>주요 주주</h2>' + lockWrap(open, holders, p.party) + '</div>' +
+      '</div>' +
+      '<div class="panel section"><h2>요약 재무 <span class="muted" style="font-size:13px;font-weight:400">단위: 천원</span></h2>' + lockWrap(open,
+        '<div class="grid2" style="margin-top:0"><div><p class="step-h" style="margin-top:0">재무상태표</p>' + fin([['자산총계', c.assets], ['부채총계', c.liab], ['자본금', [c.cap,c.cap,c.cap]], ['자본총계', c.eq]]) + '</div>' +
+        '<div><p class="step-h" style="margin-top:0">손익계산서</p>' + fin([['매출액', c.rev], ['영업이익', c.op], ['당기순이익', c.ni]]) + '</div></div>' +
+        '<p class="step-h">종업원 현황 (국민연금 기준)</p>' + emp, p.party) + '</div>' +
+      '<div class="panel section"><h2>우리 회사와의 거래</h2>' + sparkSVG(p.hist) +
+        '<ul class="rows" style="margin-top:8px">' + p.trades.slice().sort((a,b) => a.due < b.due ? 1 : -1).map(x => '<li><span class="when">' + esc(md(x.due)) + '</span><span>' + esc(x.item) + ' ' + x.qty.toLocaleString('ko-KR') + '개 <span class="muted" style="font-size:13px">' + esc({ open: diff(x.due) < 0 ? '연체' : '입금 대기', paid: p.role === 'sale' ? '입금 완료' : '지급 완료', ordered: '결제 예정', financed: '플로우페이 결제', repaid: '플로우페이 상환 완료', factored: '유동화 완료', bundled: '묶음 정산' }[x.status] || '') + (x.paidOn && x.paidOn > x.due ? ' · ' + between(x.due, x.paidOn) + '일 늦음' : '') + '</span></span><span class="num">' + man(total(x)) + '</span></li>').join('') + '</ul></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px"><button class="primary" data-act="scReqOpen" data-role="' + p.role + '" data-party="' + esc(p.party) + '">추가 정보 요청</button><a class="btn" href="#score">목록으로</a></div>' +
+      '<p class="muted" style="font-size:13px;margin-top:12px">테스트용 가상 데이터입니다. 실제 서비스에서는 제휴 신용평가사 정보를 상대 기업 동의 후 보여줍니다.</p>';
+  }
+
+  /* ---------- FUND ---------- */
+  let fundFilter = '전체';
+  const FUNDS = [
+    { id: 'f1', type: '융자', name: '중소기업 정책자금 (운전자금)', org: '중소벤처기업 정책금융기관', amount: '최대 5억원', d: 12, fit: '적합', target: '업력 7년 미만 제조·도소매 중소기업', content: '원부자재 구매, 운영비 등 운전자금을 정책금리로 융자', docs: ['biz','fin','ntax','ltax','corp'] },
+    { id: 'f2', type: '보증', name: '신용보증기관 보증서 대출', org: '신용보증기관', amount: '최대 3억원 (보증비율 85%)', d: 25, fit: '적합', target: '신용등급 기준을 충족하는 중소기업', content: '보증서를 담보로 은행에서 운전·시설자금 대출', docs: ['biz','fin','ntax','ltax','holders','bank'] },
+    { id: 'f3', type: '융자', name: '지자체 경영안정자금 (이자 지원)', org: '광역지자체', amount: '최대 2억원, 이자 일부 지원', d: 5, fit: '확인 필요', target: '해당 지자체에 본사나 공장이 있는 중소기업', content: '협약 은행 대출의 이자 일부를 지자체가 지원', docs: ['biz','fin','ltax','corp'] },
+    { id: 'f4', type: '지원사업', name: '수출 마케팅 바우처', org: '수출지원기관', amount: '최대 5,000만원 (자부담 일부)', d: 40, fit: '확인 필요', target: '수출 실적이나 수출 계획이 있는 중소기업', content: '해외 전시회, 현지화, 홍보 등 수출 마케팅 비용 지원', docs: ['biz','fin','saleTax'] },
+    { id: 'f5', type: '지원사업', name: '스마트공장 구축 지원', org: '중소기업 지원기관', amount: '구축비의 최대 50%', d: 18, fit: '적합', target: '제조업 영위 중소기업', content: '생산 관리 시스템, 자동화 설비 구축 비용 일부 지원', docs: ['biz','fin','ins','ntax'] },
+    { id: 'f6', type: '지원사업', name: '판로개척 온라인 입점 지원', org: '중소기업 유통지원기관', amount: '최대 1,000만원', d: 3, fit: '적합', target: '자사 제품을 보유한 중소기업', content: '온라인 쇼핑몰 입점, 상세페이지 제작, 광고 비용 지원', docs: ['biz','ntax','ltax'] },
+  ];
+  function fundDue(f){ return addDays(f.d); }
+  function renderFund(){
+    document.getElementById('fdCond').textContent = S.company + ' 기준: 제조·도소매, 업력 6년, 최근 매출 약 12억원, 경기 소재 (테스트 값). 조건에 맞춰 적합도를 표시합니다.';
+    document.getElementById('fdChips').innerHTML = ['전체','융자','보증','지원사업','관심 등록'].map(c => '<button class="' + (c === fundFilter ? 'on' : '') + '" data-act="fdFilter" data-f="' + c + '">' + c + (c === '관심 등록' ? ' ' + S.fav.length : '') + '</button>').join('');
+    const list = FUNDS.filter(f => fundFilter === '전체' || (fundFilter === '관심 등록' ? S.fav.includes(f.id) : f.type === fundFilter)).sort((a,b) => a.d - b.d);
+    document.getElementById('fdList').innerHTML = list.length ? list.map(f => {
+      const fav = S.fav.includes(f.id);
+      return '<div class="fund"><div><span class="tag' + (f.type === '지원사업' ? '' : '') + '">' + f.type + '</span> <span class="tag' + (f.fit === '적합' ? '' : ' warn') + '">' + f.fit + '</span> <span class="dday' + (f.d <= 7 ? ' alert' : ' muted') + '">마감 D-' + f.d + '</span>' +
+        '<h3>' + esc(f.name) + '</h3><small>' + esc(f.org) + ', ' + esc(f.amount) + '</small></div>' +
+        '<div class="acts"><button class="small" data-act="fdFav" data-id="' + f.id + '">' + (fav ? '관심 해제' : '관심 등록') + '</button><button class="small primary" data-act="fdOpen" data-id="' + f.id + '">자세히</button></div></div>';
+    }).join('') : '<p class="empty">' + (fundFilter === '관심 등록' ? '관심 등록한 사업이 없습니다.' : '조건에 맞는 사업이 없습니다.') + '</p>';
+  }
+  function openFund(id){
+    const f = FUNDS.find(x => x.id === id); if (!f) return;
+    const docs = f.docs.map(k => { const r = DOCS.find(x => x.key === k); const st = docState(r); return '<div class="docrow"><div>' + esc(r.name) + '</div>' + (st.s === 'ok' || st.s === 'soon' ? '<span class="tag">서류함에 있음</span>' : '<span class="tag warn">' + (st.s === 'missing' ? '미등록' : st.s === 'rejected' ? '반려' : '만료') + '</span>') + '</div>'; }).join('');
+    const ready = f.docs.filter(k => ['ok','soon'].includes(docState(DOCS.find(x => x.key === k)).s)).length;
+    openDlg('<h2>' + esc(f.name) + '</h2>' +
+      '<dl class="kv"><dt>운영기관</dt><dd>' + esc(f.org) + '</dd><dt>유형</dt><dd>' + f.type + '</dd><dt>지원 규모</dt><dd>' + esc(f.amount) + '</dd><dt>마감</dt><dd>' + esc(md(fundDue(f))) + ' (D-' + f.d + ')</dd><dt>지원 대상</dt><dd>' + esc(f.target) + '</dd><dt>지원 내용</dt><dd>' + esc(f.content) + '</dd><dt>적합도</dt><dd>' + f.fit + (f.fit === '적합' ? '' : ' (지원 요건을 직접 확인해 주세요)') + '</dd></dl>' +
+      '<p class="step-h">필요 서류 (기업 서류함과 대조)</p><p class="sum">필요 서류 ' + f.docs.length + '건 중 ' + ready + '건이 서류함에 있습니다.</p>' + docs +
+      (f.type !== '지원사업' ? '<p class="step-h">자금 공백은 플로우페이로</p><p class="muted" style="font-size:14px">정책자금은 신청부터 집행까지 수 주 이상 걸릴 수 있습니다. 그 사이 매입 대금이 필요하면 매출과 묶어 플로우페이로 먼저 결제할 수 있습니다.</p>' : '') +
+      '<div class="foot"><button type="button" data-act="close">닫기</button>' + (f.type !== '지원사업' ? '<a class="btn" href="#orders" data-act="close">매입업무에서 플로우페이 신청</a>' : '') + '<button class="primary" type="button" data-act="fdFav" data-id="' + f.id + '" data-keep="1">' + (S.fav.includes(f.id) ? '관심 해제' : '관심 등록') + '</button></div>');
+  }
+
+  /* ---------- FLOWPAY ---------- */
+  const STEPS = { buy: ['신청', '거래 상대 확인', '심사', '전자서명', '집행', '상환'], ar: ['신청', '심사', '전자서명', '채무자 통지', '집행', '상환'] };
+  const STEP_IDX = { buy: { confirm: 1, review: 2, rejected: 2, sign: 3, done: 4 }, ar: { review: 1, rejected: 1, sign: 2, notice: 3, done: 4 } };
+  function appName(a){
+    const ref = a.type === 'buy' ? S.purchases.find(p => p.id === a.refId) : S.sales.find(s => s.id === a.refId);
+    return (ref ? ref.party + ' (' + ref.item + ')' : '삭제된 거래') + (a.links ? ' + 매출 ' + linkNames(a.links) : '');
+  }
+  function appKind(a){ return a.type === 'buy' ? (a.links ? '매입·매출 묶음' : '매입 자금') : '매출채권 유동화'; }
+  function outcomeTag(a){ return a.outcome === 'repaid' ? '<span class="tag">상환 완료</span>' : a.outcome === 'late' ? '<span class="tag warn">연체</span>' : '<span class="tag">상환 대기</span>'; }
+  function renderFlowpay(){
+    const me = myScore(), li = limitInfo();
+    document.getElementById('score').textContent = me.v;
+    document.getElementById('scoreNote').innerHTML = '지난달 말 ' + me.prev + '점에서 ' + (me.v === me.prev ? '변동 없음' : ptsHTML(me.v - me.prev)) + '. 점수에 영향이 큰 이유 3가지:';
+    document.getElementById('scoreWhy').innerHTML = whyHTML(me.why).replace(/^<ul class="why">|<\/ul>$/g, '');
+    document.getElementById('limitNote').innerHTML = '이용 한도 <b class="num">' + man(li.lim) + '</b> <span class="muted" style="font-size:13px">(점수 기준 가정값)</span>' +
+      (li.late ? '<br><span class="alert" style="font-size:13px">세금계산서 발행 기한이 지난 매출 ' + li.late + '건이 있어 한도를 30% 줄였습니다. 발행하면 다시 늘어납니다.</span>' : '');
+    const appHTML = a => {
+      const steps = STEPS[a.type], i = a.outcome ? 5 : STEP_IDX[a.type][a.status];
+      let btn = '';
+      if (a.status === 'confirm') btn = a.links.map(sid => S.sales.find(x => x.id === sid)).filter(x => x && x.confirm !== 'confirmed').map(x => '<button class="small" data-act="cfm" data-id="' + a.id + '" data-sid="' + x.id + '">' + esc(x.party) + ' 확인 (테스트)</button>').join('');
+      if (a.status === 'review') btn = '<span class="muted" style="font-size:13px">심사역 화면에서 심사합니다</span>';
+      if (a.status === 'sign') btn = '<button class="small primary" data-act="sign" data-id="' + a.id + '">전자서명하기</button>';
+      if (a.status === 'notice') btn = '<button class="small" data-act="notice" data-id="' + a.id + '">채무자 승낙 확인 (테스트)</button>';
+      if (a.status === 'done') btn = outcomeTag(a);
+      if (a.status === 'rejected') btn = '<span class="tag warn">반려</span>';
+      return '<div class="app"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><b>' + appKind(a) + '</b> <span class="muted">' + esc(appName(a)) + '</span></div><span class="num">' + man(a.amount) + '</span></div>' +
+        '<div class="steps">' + steps.map((s,k) => '<span class="' + (k <= i ? 'on' : '') + '">' + s + '</span>').join('') + '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span class="muted" style="font-size:13px">' + esc(a.note) + '</span><span class="acts">' + btn + '</span></div></div>';
+    };
+    const buys = S.apps.filter(a => a.type === 'buy').reverse(), ars = S.apps.filter(a => a.type === 'ar').reverse();
+    document.getElementById('apps').innerHTML = buys.length ? buys.map(appHTML).join('') : '<p class="empty">아직 신청 내역이 없습니다. 홈의 자금 부족 알림이나 매입업무 화면에서 신청해 보세요.</p>';
+    document.getElementById('appsAr').innerHTML = ars.length ? ars.map(appHTML).join('') : '<p class="empty">아직 유동화 신청 내역이 없습니다.</p>';
+    const open = S.sales.filter(x => x.status === 'open' && x.tax === 'issued' && diff(x.due) >= 0 && !appFor(x.id)).sort((x,y) => x.due < y.due ? -1 : 1);
+    document.getElementById('arRows').innerHTML = open.length ? open.map(x => {
+      const d = diff(x.due);
+      return '<li><span class="when' + (d < 0 ? ' alert' : '') + '">' + esc(when(d)) + '</span><span>' + esc(x.party) + ' (' + esc(x.item) + ') <b class="num">' + man(total(x)) + '</b></span><button class="small" data-act="factor" data-id="' + x.id + '">유동화 신청</button></li>';
+    }).join('') : '<li class="empty">신청할 수 있는 매출채권이 없습니다. 세금계산서를 발행한 매출 중 연체·입금 완료가 아닌 건만 신청할 수 있습니다.</li>';
+  }
+
+  /* ---------- REVIEW (심사역) ---------- */
+  const REASONS = ['입금 이력 양호', '거래 기간 충분', '관련 거래처 우량', '매출처 집중', '입금 지연 반복', '세금계산서 미발행', '서류 불일치', '한도 초과'];
+  function relatedParties(ap){
+    const ids = ap.type === 'buy' ? (ap.links || []) : [ap.refId];
+    const names = ids.map(i => (S.sales.find(x => x.id === i) || {}).party).filter(Boolean);
+    return partners().filter(p => p.role === 'sale' && names.includes(p.party));
+  }
+  function riskFlags(ap, li){
+    const fl = [];
+    const linked = (ap.links || []).map(i => S.sales.find(x => x.id === i)).filter(Boolean);
+    const noTax = linked.filter(x => x.tax !== 'issued'), late = linked.filter(x => taxLate(x));
+    if (noTax.length) fl.push(['warn', '미발행 매출 묶음 ' + noTax.length + '건']);
+    if (noTax.length && noTax.every(x => x.confirm === 'confirmed')) fl.push(['', '거래 상대 확인 완료']);
+    if (late.length) fl.push(['warn', '세금계산서 발행 기한 경과 ' + late.length + '건']);
+    if (ap.amount > li.lim) fl.push(['warn', '한도 초과 (한도 ' + man(li.lim) + ')']);
+    relatedParties(ap).forEach(p => { if (p.od.length) fl.push(['warn', p.party + ' 연체 중']); if (p.sig.includes('입금 지연 반복')) fl.push(['warn', p.party + ' 입금 지연 반복']); });
+    if (ap.type === 'ar') fl.push(['', '전자서명 후 채무자 통지 필요']);
+    if (S.disputes.some(d => d.status === 'open' && d.target === '우리 회사')) fl.push(['warn', '우리 회사 점수 이의 제기 접수 중']);
+    return fl;
+  }
+  function renderReview(){
+    const me = myScore(), li = limitInfo();
+    const q = S.apps.filter(a => a.status === 'review');
+    document.getElementById('rvQueue').innerHTML = q.length ? q.map(ap => {
+      const ps = relatedParties(ap);
+      return '<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><h3>' + appKind(ap) + ' <span class="muted" style="font-weight:400">' + esc(appName(ap)) + '</span></h3><b class="num">' + man(ap.amount) + '</b></div>' +
+        '<div class="flags">' + riskFlags(ap, li).map(f => '<span class="tag ' + f[0] + '">' + esc(f[1]) + '</span>').join('') + '</div>' +
+        '<div class="grid2" style="margin-top:4px"><div><p class="step-h" style="margin-top:0">신청 기업 (' + esc(S.company) + ') ' + me.v + '점 <span class="gr gr-' + grade(me.v) + '">' + grade(me.v) + '</span></p>' + whyHTML(me.why) + '</div>' +
+        '<div>' + (ps.length ? ps.map(p => '<p class="step-h" style="margin-top:0">' + (ap.type === 'buy' ? '묶은 매출처 ' : '채무자 ') + esc(p.party) + ' ' + p.v + '점 <span class="gr gr-' + p.g + '">' + p.g + '</span></p>' + whyHTML(p.why)).join('') : '<p class="muted">관련 매출처 없음</p>') + '</div></div>' +
+        '<p class="step-h">판단 사유 (하나 이상)</p><div class="reasons">' + REASONS.map(r => '<label><input type="checkbox" name="rr_' + ap.id + '" value="' + r + '">' + r + '</label>').join('') + '</div>' +
+        '<div class="acts" style="justify-content:flex-end"><button class="small" data-act="rvReject" data-id="' + ap.id + '">반려</button><button class="small primary" data-act="rvApprove" data-id="' + ap.id + '">승인</button></div></div>';
+    }).join('') : '<p class="empty">심사할 신청이 없습니다. 고객 화면에서 플로우페이나 유동화를 신청해 보세요.</p>';
+    const af = S.apps.filter(a => a.status === 'done' && !a.outcome);
+    document.getElementById('rvAfter').innerHTML = af.length ? '<ul class="rows">' + af.map(ap => '<li style="grid-template-columns:1fr auto auto"><span><b>' + appKind(ap) + '</b> <span class="muted" style="font-size:13px">' + esc(appName(ap)) + '</span></span><span class="num">' + man(ap.amount) + '</span><span class="acts"><button class="small" data-act="rvOut" data-r="late" data-id="' + ap.id + '">연체 처리</button><button class="small primary" data-act="rvOut" data-r="repaid" data-id="' + ap.id + '">상환 완료</button></span></li>').join('') + '</ul>' : '<p class="empty">상환을 기다리는 건이 없습니다.</p>';
+    const ds = S.disputes.slice().reverse();
+    document.getElementById('rvDisputes').innerHTML = ds.length ? '<ul class="rows">' + ds.map(d => '<li style="grid-template-columns:72px 1fr auto"><span class="when">' + esc(md(d.date)) + '</span><span><b>' + esc(d.target) + '</b> <span class="muted" style="font-size:13px">' + esc(d.text) + '</span></span>' + (d.status === 'open' ? '<button class="small" data-act="disputeDone" data-id="' + d.id + '">검토 완료</button>' : '<span class="tag">검토 완료</span>') + '</li>').join('') + '</ul>' : '<p class="empty">접수된 이의 제기가 없습니다.</p>';
+    const dec = S.apps.filter(a => a.decision).slice().reverse();
+    document.getElementById('rvLog').innerHTML = dec.length ? '<div class="tbl mini" style="margin-top:0"><table><thead><tr><th>판단일</th><th>신청</th><th>결과</th><th>판단 사유</th><th class="r">당시 점수</th><th>이후 결과</th></tr></thead><tbody>' +
+      dec.map(a => '<tr><td>' + esc(md(a.decision.date)) + '</td><td>' + appKind(a) + '<div class="muted" style="font-size:12px">' + esc(appName(a)) + ', ' + man(a.amount) + '</div></td><td>' + (a.decision.result === '승인' ? '<span class="tag">승인</span>' : '<span class="tag warn">반려</span>') + '</td><td style="font-size:13px">' + esc(a.decision.reasons.join(', ')) + '</td><td class="r num">' + a.decision.score + '</td><td>' + (a.decision.result === '반려' ? '<span class="muted">-</span>' : a.status === 'done' ? outcomeTag(a) : '<span class="muted">진행 중</span>') + '</td></tr>').join('') +
+      '</tbody></table></div><p class="muted" style="font-size:13px;margin-top:8px">판단 사유와 이후 상환 결과를 함께 쌓아, 어떤 판단이 맞았는지 검증하고 산식을 고치는 데 씁니다.</p>' : '<p class="empty">아직 판단 기록이 없습니다.</p>';
+  }
+  function openMyScore(){
+    const me = myScore();
+    openDlg('<h2>우리 회사 플로우스코어</h2><div class="score" style="margin-bottom:4px"><b class="num">' + me.v + '</b><span class="gr gr-' + grade(me.v) + '">' + grade(me.v) + ' ' + GRADE_NAME[grade(me.v)] + '</span></div>' +
+      '<p class="muted" style="font-size:13px">최근 월별 추이</p>' + sparkSVG(me.hist) +
+      '<p class="step-h">산식과 근거</p>' + factorTable(BASE.me, me.f, me.v) +
+      '<p class="step-h">점수 변동 기록</p>' + logHTML(S.scoreLog.filter(l => l.target === '우리 회사').slice(-8).reverse()) +
+      '<p class="muted" style="font-size:13px;margin-top:10px">참고 지표이며 신용평가가 아닙니다. 산식은 테스트용 가정값이며 심사팀 검증 후 확정합니다.</p>' +
+      '<div class="foot"><button type="button" data-act="dispute" data-target="우리 회사">이의 제기</button><button class="primary" type="button" data-act="close">닫기</button></div>');
+  }
+
+  /* ---------- dialogs ---------- */
+  const dlg = document.getElementById('dlg'), body = document.getElementById('dlgBody');
+  function openDlg(html){ body.innerHTML = html; if (dlg.open) return; if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', ''); }
+  function closeDlg(){ if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open'); }
+
+  function openApply(type, id){
+    const isBuy = type === 'buy';
+    const ref = isBuy ? S.purchases.find(x => x.id === id) : S.sales.find(x => x.id === id);
+    if (!ref) return;
+    const amt = total(ref), chk = docCheck(amt);
+    const keep = curApply && curApply.type === type && curApply.id === id;
+    curApply = { type, id, sel: keep && curApply.sel ? curApply.sel : [] };
+    let info;
+    let linkSec = '';
+    if (isBuy){
+      const repay = addDays(TERM_DAYS, ref.due);
+      info = '<dl class="kv"><dt>매입처</dt><dd>' + esc(ref.party) + '</dd><dt>품목</dt><dd>' + esc(ref.item) + ' ' + ref.qty.toLocaleString('ko-KR') + '개</dd><dt>결제 금액</dt><dd class="num">' + won(amt) + '</dd><dt>상환 금액</dt><dd class="num">' + won(amt * (1 + FEE_BUY)) + '</dd></dl>';
+      const el = eligibleSales();
+      linkSec = '<p class="step-h">2. 함께 묶을 매출 선택</p><p class="muted" style="font-size:14px;margin-bottom:6px">매출업무에서 플로우페이 신청이 가능한 거래명세서입니다. 고르신 매출의 입금으로 매입 대금을 상환합니다.</p>';
+      if (!el.length) linkSec += '<p class="sum" style="background:var(--warn-soft)">신청 가능한 매출이 없습니다. 매출업무에서 거래명세서를 먼저 발행해 주세요.</p><p style="margin-top:8px"><a class="btn" href="#sales" data-act="close">매출업무로 이동</a></p>';
+      else {
+        linkSec += el.map(x => '<div class="docrow"><label class="check"><input type="checkbox" id="lk_' + x.id + '"' + (curApply.sel.includes(x.id) ? ' checked' : '') + '> <span>' + esc(x.party) + ' (' + esc(x.item) + ')<small>입금 예정일 ' + esc(md(x.due)) + (taxLate(x) ? ' · <span class="alert">세금계산서 발행 기한 경과</span>' : '') + '</small></span></label><b class="num">' + man(total(x)) + '</b></div>').join('') +
+          '<p class="muted" style="font-size:13px;margin-top:6px">세금계산서를 발행하지 않은 매출이라, 신청하면 거래 상대에게 거래 확인 요청을 보냅니다. 확인되면 심사로 넘어갑니다. 발행 기한이 지난 매출은 심사에서 리스크로 표시되고 한도가 줄어듭니다.</p>';
+        const linked = curApply.sel.reduce((t,i) => { const x = S.sales.find(y => y.id === i); return t + (x ? total(x) : 0); }, 0);
+        const due = Math.round(amt * (1 + FEE_BUY)) - mUse(type, amt);
+        if (linked > 0) linkSec += '<p class="sum" style="margin-top:8px">' + (linked >= due
+          ? '묶은 매출 ' + won(linked) + '의 입금으로 상환 금액 ' + won(due) + '을 모두 갚고, 남는 ' + won(linked - due) + '은 입금일에 지급합니다.'
+          : '묶은 매출 ' + won(linked) + '의 입금으로 먼저 상환하고, 부족분 ' + won(due - linked) + '은 ' + md(repay) + '(결제일 ' + TERM_DAYS + '일 뒤)까지 상환합니다.') + '</p>';
+      }
+    } else {
+      info = '<dl class="kv"><dt>고객사</dt><dd>' + esc(ref.party) + '</dd><dt>채권 금액</dt><dd class="num">' + won(amt) + '</dd><dt>입금 예정일</dt><dd>' + esc(md(ref.due)) + '</dd><dt>먼저 받는 금액</dt><dd class="num">' + won(amt * (1 - FEE_AR)) + '</dd></dl>';
+    }
+    const up = (r, label) => '<button class="small' + (label ? '' : ' primary') + '" data-act="upload" data-doc="' + r.key + '" data-ctx="apply" data-type="' + type + '" data-ref="' + id + '">' + (label || '새 서류 올리기') + '</button>';
+    const reused = chk.reuse.length + chk.soon.length;
+    const summary = chk.need.length
+      ? '필요 서류 ' + chk.req.length + '건 중 ' + reused + '건은 등록된 서류를 그대로 씁니다. 아래 ' + chk.need.length + '건만 올려 주세요.'
+      : '필요 서류 ' + chk.req.length + '건이 모두 준비됐습니다.' + (chk.fresh ? ' 이번에 새로 받은 서류는 ' + chk.fresh + '건입니다.' : '');
+    let docs = '<p class="sum">' + summary + '</p>';
+    if (chk.need.length) docs += '<div style="margin-top:6px">' + chk.need.map(({r, st}) => '<div class="docrow"><div>' + esc(r.name) + ' ' + docTag(st.s === 'consent' ? {s:'missing'} : st) + '<small>' + esc(reason(r, st)) + '</small></div>' + up(r) + '</div>').join('') + '</div>';
+    if (chk.soon.length) docs += '<p class="step-h" style="font-size:14px">미리 올리면 좋은 서류</p>' + chk.soon.map(({r, st}) => '<div class="docrow"><div>' + esc(r.name) + ' ' + docTag(st) + '<small>' + esc(reason(r, st)) + '</small></div>' + up(r, '미리 올리기') + '</div>').join('');
+    if (chk.reuse.length) docs += '<details><summary>그대로 쓰는 서류 ' + chk.reuse.length + '건 보기</summary>' + chk.reuse.map(({r}) => '<div class="docrow"><div>' + esc(r.name) + '<small>' + (S.docs[r.key] ? md(S.docs[r.key].issued) + ' 발급' : '') + '</small></div>' + docTag({s:'ok'}) + '</div>').join('') + '</details>';
+    openDlg('<h2>' + (isBuy ? '플로우페이로 매입 자금 신청' : '매출채권 유동화 신청') + '</h2>' +
+      '<p class="step-h" style="margin-top:0">1. 거래 정보 (' + (isBuy ? '발주서' : '거래명세서') + '에서 자동 입력)</p>' + info +
+      (isBuy ? '' : '<p class="sum" style="margin-bottom:6px">양수도 가능, 결제 계좌 변경 협조 두 항목을 확인했습니다. 심사 승인과 전자서명 후 고객사에 채권 양도를 통지하고, 고객사 승낙이 확인되면 자금을 지급합니다.</p>') +
+      linkSec +
+      '<p class="step-h">' + (isBuy ? '3' : '2') + '. 기업 서류 점검</p>' + docs +
+      mileageHTML(type, amt) +
+      '<p class="muted" style="font-size:13px;margin-top:14px">' + (isBuy ? '플로우페이가 매입처에 먼저 결제하고, 상환일에 정산합니다. 수수료 ' + (FEE_BUY*100) + '%' : '입금 예정일을 기다리지 않고 자금을 먼저 받습니다. 할인율 ' + (FEE_AR*100) + '%') + '는 테스트용 가정입니다.</p>' +
+      '<div class="foot"><button type="button" data-act="close">취소</button><button class="primary" type="button" data-act="submitApply" data-type="' + type + '" data-id="' + id + '"' + (chk.need.length || (isBuy && !curApply.sel.length) ? ' disabled' : '') + '>' + (isBuy && !curApply.sel.length ? '함께 묶을 매출을 골라 주세요' : chk.need.length ? '서류 ' + chk.need.length + '건을 올리면 신청할 수 있습니다' : (isBuy ? '매입·매출 묶음으로 신청하기' : '신청하기')) + '</button></div>');
+  }
+  function eligiblePurchases(){ return S.purchases.filter(p => p.status === 'ordered' && !appFor(p.id)).sort((x,y) => x.due < y.due ? -1 : 1); }
+  function openPick(sid){
+    const sx = S.sales.find(x => x.id === sid); if (!sx) return;
+    const el = eligiblePurchases();
+    let h = '<h2>플로우페이 신청</h2><p class="step-h" style="margin-top:0">1. 매출 정보 (거래명세서)</p>' +
+      '<dl class="kv"><dt>고객사</dt><dd>' + esc(sx.party) + '</dd><dt>품목</dt><dd>' + esc(sx.item) + ' ' + sx.qty.toLocaleString('ko-KR') + '개</dd><dt>금액</dt><dd class="num">' + won(total(sx)) + '</dd><dt>입금 예정일</dt><dd>' + esc(md(sx.due)) + '</dd></dl>' +
+      '<p class="step-h">2. 함께 묶을 매입 선택</p><p class="muted" style="font-size:14px;margin-bottom:6px">매입업무에서 플로우페이로 결제할 수 있는 발주서입니다. 고른 매입 대금을 플로우페이가 먼저 결제하고, 이 매출의 입금으로 상환합니다.</p>';
+    if (!el.length) h += '<p class="sum" style="background:var(--warn-soft)">플로우페이로 결제할 수 있는 발주서가 없습니다. 매입업무에서 발주서를 먼저 보내 주세요.</p><div class="foot"><button type="button" data-act="close">닫기</button><a class="btn" href="#orders" data-act="close">매입업무로 이동</a></div>';
+    else h += el.map(p => '<div class="docrow"><label class="check"><input type="radio" name="pk" value="' + p.id + '"> <span>' + esc(p.party) + ' (' + esc(p.item) + ')<small>결제일 ' + esc(md(p.due)) + '</small></span></label><b class="num">' + man(total(p)) + '</b></div>').join('') +
+      '<div class="foot"><button type="button" data-act="close">취소</button><button class="primary" type="button" id="pickNext" data-act="pickNext" data-sid="' + sid + '" disabled>함께 묶을 매입을 골라 주세요</button></div>';
+    openDlg(h);
+  }
+  function mileageHTML(type, amt){
+    const bal = mBal(), cap = mCap(type, amt), use = mUse(type, amt);
+    let h = '<p class="step-h">' + (type === 'buy' ? '4' : '3') + '. 마일리지</p>';
+    if (bal <= 0) h += '<p class="muted" style="font-size:14px">사용할 마일리지가 없습니다.</p>';
+    else {
+      h += '<label class="check"><input type="checkbox" id="useM"' + (useM ? ' checked' : '') + '> 마일리지 ' + won(Math.min(bal, cap)) + ' 사용 (보유 ' + won(bal) + ')</label>';
+      h += '<p class="muted" style="font-size:13px;margin-top:4px">' + (type === 'buy'
+        ? '상환 금액에서 차감합니다. 차감 후 상환 금액은 ' + won(cap - use) + '입니다.'
+        : '할인료에서 차감합니다. 먼저 받는 금액은 ' + won(amt - cap + use) + '입니다.') + '</p>';
+    }
+    h += '<p class="muted" style="font-size:13px;margin-top:4px">집행되면 이용 금액의 ' + (EARN * 100) + '% (' + won(amt * EARN) + ')가 다시 적립됩니다 (테스트 가정).</p>';
+    return h;
+  }
+  let arAgreed = false, gate = null;
+  function openArGuide(ctx){
+    gate = ctx;
+    const tg = S.sales.find(y => y.id === ctx.id);
+    openDlg('<h2>매출채권 유동화 전 확인해 주세요</h2>' +
+      (tg ? '<p class="sum" style="margin-bottom:10px">대상 채권: ' + esc(tg.party) + ' (' + esc(tg.item) + '), ' + man(total(tg)) + ', 입금 예정일 ' + esc(md(tg.due)) + '</p>' : '') +
+      '<p class="muted" style="font-size:14px;margin:0">이 채권에 대해 아래 두 가지가 모두 가능해야 유동화를 진행할 수 있습니다.</p>' +
+      '<div class="guide-item"><h3>1. 매출채권의 양수도가 가능해야 합니다</h3>' +
+      '<p>유동화는 고객사에게 받을 돈(매출채권)을 플로우페이로 넘기는 구조입니다. 고객사와의 계약에 채권 양도를 금지하는 조항이 없어야 하고, 이미 다른 곳에 양도했거나 담보로 제공한 채권이 아니어야 합니다.</p>' +
+      '<label class="check"><input type="checkbox" id="arc1"> 계약상 양도 금지 조항이 없고, 다른 곳에 양도하거나 담보로 제공하지 않은 채권임을 확인합니다.</label></div>' +
+      '<div class="guide-item"><h3>2. 결제 계좌를 당사 계좌로 바꿀 수 있어야 합니다</h3>' +
+      '<p>유동화 후에는 고객사가 대금을 당사가 지정한 계좌로 입금해야 합니다. 고객사에 채권 양도 사실을 통지하거나 승낙을 받고, 결제 계좌 변경을 안내할 수 있어야 합니다.</p>' +
+      '<label class="check"><input type="checkbox" id="arc2"> 고객사의 결제 계좌를 당사 지정 계좌로 변경하는 데 협조할 수 있음을 확인합니다.</label></div>' +
+      '<div class="foot"><button type="button" data-act="arCancel">취소</button><button class="primary" type="button" id="arNext" data-act="arNext" disabled>두 항목을 확인하면 진행할 수 있습니다</button></div>');
+  }
+  function openStmt(id){
+    const s = S.sales.find(x => x.id === id); if (!s) return;
+    const supply = s.qty * s.price, vat = Math.round(supply * 0.1);
+    openDlg('<h2>거래명세서</h2><div class="stmt"><dl class="kv"><dt>공급자</dt><dd>' + esc(S.company) + '</dd><dt>공급받는자</dt><dd>' + esc(s.party) + '</dd><dt>발행일</dt><dd>' + esc(md(s.issued)) + '</dd><dt>입금 예정일</dt><dd>' + esc(md(s.due)) + '</dd></dl><table><thead><tr><th>품목</th><th class="r">수량</th><th class="r">단가</th><th class="r">공급가액</th></tr></thead><tbody><tr><td>' + esc(s.item) + '</td><td class="r num">' + s.qty.toLocaleString('ko-KR') + '</td><td class="r num">' + won(s.price) + '</td><td class="r num">' + won(supply) + '</td></tr></tbody></table><dl class="kv" style="margin:14px 0 0"><dt>세액</dt><dd class="num">' + won(vat) + '</dd><dt>합계</dt><dd class="num"><b>' + won(supply + vat) + '</b></dd></dl></div><p class="muted" style="font-size:13px;margin-top:10px">실제 서비스에서는 고객사가 이 명세서를 링크로 받아 가입 없이 확인합니다.</p><div class="foot"><button class="primary" type="button" data-act="close">닫기</button></div>');
+  }
+
+  /* ---------- toast ---------- */
+  let tt;
+  function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); }
+
+  /* ---------- actions ---------- */
+  function act(a, el){
+    const id = el.dataset.id, pre = scoreMap();
+    let why = null;
+    if (a === 'finance'){ const fp = S.purchases.find(x => x.id === id); if (!fp || fp.status !== 'ordered') return toast('지급이 완료된 매입은 플로우페이로 결제할 수 없습니다'); return openApply('buy', id); }
+    if (a === 'factor'){ const fx = S.sales.find(x => x.id === id); if (fx && fx.tax !== 'issued') return toast('세금계산서를 발행한 매출만 유동화할 수 있습니다'); if (fx && (fx.status !== 'open' || diff(fx.due) < 0)) return toast('연체되었거나 입금이 완료된 매출은 유동화할 수 없습니다'); return openArGuide({ to: 'apply', id }); }
+    if (a === 'arCancel'){ const g = gate; gate = null; closeDlg(); if (g && g.to === 'menu' && !arAgreed) location.hash = 'flowpay'; return; }
+    if (a === 'arNext'){
+      if (!(document.getElementById('arc1').checked && document.getElementById('arc2').checked)) return;
+      arAgreed = true; const g = gate; gate = null;
+      if (g && g.to === 'apply') return openApply('ar', g.id);
+      closeDlg(); toast('확인을 마쳤습니다. 유동화할 채권을 골라 주세요'); route(); return;
+    }
+    if (a === 'stmt') return openStmt(id);
+    if (a === 'close') return closeDlg();
+    if (a === 'scOpen'){ curCo = { role: el.dataset.role, party: el.dataset.party }; renderCompany(); location.hash = 'company'; window.scrollTo(0, 0); return; }
+    if (a === 'scReqOpen') return openScore(el.dataset.role, el.dataset.party);
+    if (a === 'fdFilter'){ fundFilter = el.dataset.f; return renderFund(); }
+    if (a === 'fdOpen') return openFund(id);
+    if (a === 'fdFav'){ S.fav = S.fav.includes(id) ? S.fav.filter(x => x !== id) : S.fav.concat(id); toast(S.fav.includes(id) ? '관심 사업으로 등록했습니다. 마감이 다가오면 자금일보로 알려드립니다' : '관심 등록을 해제했습니다'); save(); renderAll(); if (el.dataset.keep) openFund(id); return; }
+    if (a === 'scSend') return toast((today0().getMonth()+1) + '월 거래처 플로우스코어 리포트를 대표님께 보냈습니다 (테스트)');
+    if (a === 'scReq'){
+      const items = [...document.querySelectorAll('input[name="rqi"]:checked')].map(x => x.value);
+      const m = (document.querySelector('input[name="rqm"]:checked') || {}).value;
+      const contact = document.getElementById('rqc').value.trim();
+      if (!items.length) return toast('요청할 항목을 하나 이상 골라 주세요');
+      if (m === 'consent' && !contact) return toast('동의 요청을 보낼 연락처를 입력해 주세요');
+      S.reqs.push({ id: uid(), party: el.dataset.party, role: el.dataset.role, items, method: m, contact, reason: document.getElementById('rqr').value, status: m === 'consent' ? 'pending' : 'done', date: iso(today0()) });
+      closeDlg(); toast(m === 'consent' ? el.dataset.party + '에 동의 요청 링크를 보냈습니다 (테스트)' : '공개 정보 조회를 요청했습니다 (테스트)');
+    }
+    if (a === 'scAgree'){ const r = S.reqs.find(x => x.id === id); if (r){ r.status = 'done'; toast(r.party + '가 동의해 리포트가 도착했습니다 (테스트)'); } }
+    if (a === 'fpSale'){ const sx = S.sales.find(x => x.id === id); if (!sx || sx.status !== 'open' || sx.tax === 'issued' || appFor(id)) return toast('플로우페이 신청 대상이 아닙니다'); return openPick(id); }
+    if (a === 'pickNext'){ const r = document.querySelector('input[name="pk"]:checked'); if (!r) return; curApply = { type: 'buy', id: r.value, sel: [el.dataset.sid] }; return openApply('buy', r.value); }
+    if (a === 'mSettle'){ S.mileage.push({ date: iso(today0()), amt: 50000, kind: '정산', label: '정산 금액 적립 (환급 대신 선택)' }); toast('정산 금액 50,000원을 마일리지로 적립했습니다 (테스트)'); }
+    if (a === 'sendReport') return toast('자금일보를 대표님께 보냈습니다 (테스트)');
+    if (a === 'upload'){
+      const r = DOCS.find(x => x.key === el.dataset.doc); if (!r) return;
+      S.docs[r.key] = { issued: iso(today0()), status: 'ok' };
+      save(); renderAll(); toast(r.name + '를 새로 올렸습니다');
+      if (el.dataset.ctx === 'apply') openApply(el.dataset.type, el.dataset.ref);
+      return;
+    }
+    if (a === 'tax'){ const s = S.sales.find(x => x.id === id); if (s){ const wasLate = taxLate(s); s.tax = 'issued'; s.taxOn = todayIso(); why = s.party + ' 세금계산서 발행' + (wasLate ? ' (기한 경과분)' : ''); toast(s.party + ' 세금계산서를 발행했습니다 (테스트)'); } }
+    if (a === 'submitApply'){
+      const type = el.dataset.type;
+      const ref = type === 'buy' ? S.purchases.find(p => p.id === id) : S.sales.find(s => s.id === id);
+      if (!ref) return;
+      const chk = docCheck(total(ref));
+      if (chk.need.length) return;
+      const links = type === 'buy' ? (curApply && curApply.id === id ? curApply.sel.filter(i => eligibleSales().some(x => x.id === i)) : []) : null;
+      if (type === 'buy' && !links.length) return;
+      const use = mUse(type, total(ref));
+      if (use > 0) S.mileage.push({ date: iso(today0()), amt: -use, kind: '사용', label: '신청 사용 (' + ref.party + ')' });
+      // 미발행 매출을 묶은 신청은 거래 상대가 확인해야 심사로 넘어감
+      const unconf = (links || []).map(i => S.sales.find(x => x.id === i)).filter(x => x && x.tax !== 'issued' && x.confirm !== 'confirmed');
+      unconf.forEach(x => { x.confirm = 'sent'; });
+      const docNote = '재사용 서류 ' + (chk.reuse.length + chk.soon.length - chk.fresh) + '건, 새로 받은 서류 ' + chk.fresh + '건을 구분해 심사 부서에 전달했습니다.' + (use ? ' 마일리지 ' + won(use) + ' 사용.' : '');
+      S.apps.push({ id: uid(), type, refId: id, links: links || undefined, amount: total(ref), mileage: use, date: todayIso(), status: unconf.length ? 'confirm' : 'review',
+        note: unconf.length ? '세금계산서 미발행 매출이라 거래 상대(' + unconf.map(x => x.party).join(', ') + ')에게 거래 확인 요청을 보냈습니다. 확인되면 심사로 넘어갑니다. ' + docNote : (links ? '매출 ' + linkNames(links) + '과 묶어 신청했습니다. ' : '') + docNote });
+      closeDlg(); toast(unconf.length ? '신청을 접수하고 거래 상대에게 확인 요청을 보냈습니다' : '플로우페이 신청을 접수했습니다');
+    }
+    if (a === 'cfm'){
+      const ap = S.apps.find(x => x.id === id), sx = S.sales.find(x => x.id === el.dataset.sid);
+      if (ap && sx){
+        sx.confirm = 'confirmed'; sx.confirmOn = todayIso();
+        const left = ap.links.map(i => S.sales.find(x => x.id === i)).filter(x => x && x.confirm !== 'confirmed');
+        if (!left.length){ ap.status = 'review'; ap.note = '거래 상대가 매출 ' + linkNames(ap.links) + '을 모두 확인했습니다. 심사 중입니다.'; }
+        else ap.note = '거래 상대 확인 대기: ' + left.map(x => x.party).join(', ') + '. 확인되면 심사로 넘어갑니다.';
+        toast(sx.party + '가 거래 내용을 확인했습니다 (테스트)');
+      }
+    }
+    if (a === 'rvApprove' || a === 'rvReject'){
+      const ap = S.apps.find(x => x.id === id); if (!ap || ap.status !== 'review') return;
+      const reasons = [...document.querySelectorAll('input[name="rr_' + id + '"]:checked')].map(x => x.value);
+      if (!reasons.length) return toast('판단 사유를 하나 이상 골라 주세요');
+      const ok = a === 'rvApprove', ps = relatedParties(ap);
+      ap.decision = { result: ok ? '승인' : '반려', reasons, date: todayIso(), score: myScore().v, partners: ps.map(p => p.party + ' ' + p.v) };
+      if (ok){ ap.status = 'sign'; ap.note = '심사가 승인됐습니다. 계약서에 전자서명하면 ' + (ap.type === 'buy' ? '집행됩니다.' : '고객사에 채권 양도를 통지합니다.'); }
+      else { ap.status = 'rejected'; ap.note = '반려 사유: ' + reasons.join(', ') + '. 보완 후 다시 신청할 수 있습니다.'; }
+      toast(ok ? '승인했습니다. 고객 화면에서 전자서명을 진행합니다' : '반려했습니다');
+    }
+    if (a === 'rvOut'){
+      const ap = S.apps.find(x => x.id === id); if (!ap || ap.status !== 'done' || ap.outcome) return;
+      const ok = el.dataset.r === 'repaid'; ap.outcome = ok ? 'repaid' : 'late'; ap.outDate = todayIso();
+      if (ap.type === 'buy'){
+        const p = S.purchases.find(x => x.id === ap.refId);
+        if (p && ok){
+          p.status = 'repaid';
+          if (p.links){
+            let rest = 0;
+            p.links.map(i => S.sales.find(x => x.id === i)).filter(Boolean).forEach(x => { x.status = 'paid'; x.paidOn = todayIso(); rest += total(x) - (x.alloc || 0); });
+            if (rest > 0) move(rest, '묶음 매출 입금 후 잔액 (' + p.party + ')');
+            if (p.remain > 0) move(-p.remain, '플로우페이 상환 부족분 (' + p.party + ')');
+          } else move(-p.repayAmount, '플로우페이 상환 (' + p.party + ')');
+        }
+        if (p && !ok) p.repayLate = todayIso();
+      } else {
+        const s = S.sales.find(x => x.id === ap.refId);
+        if (s){ if (ok) s.paidOn = todayIso(); else s.arLate = todayIso(); }
+      }
+      ap.note = ok ? '상환을 마쳤습니다.' : '상환이 연체됐습니다. 플로우스코어에 반영했습니다.';
+      why = '플로우페이 ' + (ok ? '상환 완료' : '연체') + ' (' + appName(ap) + ')';
+      toast(ok ? '상환 완료로 기록했습니다' : '연체로 기록했습니다');
+    }
+    if (a === 'dispute'){
+      return openDlg('<h2>플로우스코어 이의 제기</h2><p class="muted" style="font-size:14px;margin-bottom:10px">대상: <b>' + esc(el.dataset.target) + '</b>. 점수 근거 중 사실과 다른 내용이 있으면 알려 주세요. 심사역이 확인하고 답변합니다.</p>' +
+        '<label>이의 내용<textarea id="dpText" placeholder="예: 브라이트몰 3월 대금은 실제로 정시에 입금됐습니다"></textarea></label>' +
+        '<div class="foot"><button type="button" data-act="close">취소</button><button class="primary" type="button" data-act="disputeSubmit" data-target="' + esc(el.dataset.target) + '">이의 제기하기</button></div>');
+    }
+    if (a === 'disputeSubmit'){
+      const tx = (document.getElementById('dpText') || {}).value || '';
+      if (!tx.trim()) return toast('이의 내용을 적어 주세요');
+      S.disputes.push({ id: uid(), date: todayIso(), target: el.dataset.target, text: tx.trim(), status: 'open' });
+      closeDlg(); toast('이의 제기를 접수했습니다. 심사역 화면에 표시됩니다');
+    }
+    if (a === 'disputeDone'){ const d = S.disputes.find(x => x.id === id); if (d){ d.status = 'closed'; d.closedOn = todayIso(); toast('검토 완료로 표시했습니다'); } }
+    if (a === 'myScore') return openMyScore();
+    if (a === 'notice'){
+      const ap = S.apps.find(x => x.id === id);
+      if (ap && ap.status === 'notice'){
+        const s = S.sales.find(x => x.id === ap.refId);
+        ap.status = 'done';
+        if (s){ s.status = 'factored'; const got = Math.round(total(s) * (1 - FEE_AR)) + (ap.mileage || 0); move(got, '유동화 자금 (' + s.party + ')'); ap.note = '고객사가 채권 양도를 승낙했습니다. ' + man(got) + '을 잔고에 넣었습니다.'; }
+        const earn = Math.round(ap.amount * EARN);
+        if (earn > 0) S.mileage.push({ date: todayIso(), amt: earn, kind: '혜택', label: '이용 적립' });
+        toast('채무자 승낙을 확인하고 자금을 지급했습니다');
+      }
+    }
+    if (a === 'sign'){
+      const ap = S.apps.find(x => x.id === id);
+      if (ap && ap.type === 'ar' && ap.status === 'sign'){
+        ap.status = 'notice';
+        ap.note = '전자서명을 마쳤습니다. 고객사에 채권 양도 통지와 결제 계좌 변경 안내를 보냈습니다. 승낙이 확인되면 자금을 지급합니다.';
+        toast('고객사에 채권 양도를 통지했습니다 (테스트)');
+      } else if (ap && ap.status === 'sign'){
+        ap.status = 'done';
+        if (ap.type === 'buy'){
+          const p = S.purchases.find(x => x.id === ap.refId);
+          if (p){
+            p.status = 'financed'; p.repayDate = addDays(TERM_DAYS, p.due); p.repayAmount = Math.round(total(p) * (1 + FEE_BUY)) - (ap.mileage || 0);
+            if (ap.links && ap.links.length){
+              let left = p.repayAmount; p.links = ap.links.slice();
+              p.links.map(i => S.sales.find(x => x.id === i)).filter(Boolean).sort((x,y) => x.due < y.due ? -1 : 1).forEach(x => {
+                const al = Math.min(total(x), left); x.status = 'bundled'; x.alloc = al; x.bundleOf = p.id; left -= al;
+              });
+              p.remain = left;
+              ap.note = '매입처에 결제했습니다. 매출 ' + linkNames(p.links) + ' 입금으로 상환합니다' + (left > 0 ? ', 부족분 ' + man(left) + '은 ' + md(p.repayDate) + '까지입니다.' : '.');
+            } else ap.note = '매입처에 결제했습니다. 상환일은 ' + md(p.repayDate) + '입니다.';
+          }
+        } else {
+          const s = S.sales.find(x => x.id === ap.refId);
+          if (s){ s.status = 'factored'; const got = Math.round(total(s) * (1 - FEE_AR)) + (ap.mileage || 0); move(got, '유동화 자금 (' + s.party + ')'); ap.note = man(got) + '을 잔고에 넣었습니다.'; }
+        }
+        const earn = Math.round(ap.amount * EARN);
+        if (earn > 0) S.mileage.push({ date: iso(today0()), amt: earn, kind: '혜택', label: '이용 적립' });
+        toast('전자서명을 마쳤고 자금을 집행했습니다');
+      }
+    }
+    const lateTxt = due => { const n = between(due, todayIso()); return n > 0 ? n + '일 늦음' : '기한 내'; };
+    if (a === 'pay'){ const p = S.purchases.find(x => x.id === id); if (p){ p.status = 'paid'; p.paidOn = todayIso(); move(-total(p), p.party + ' 대금'); why = p.party + ' 대금 지급 (' + lateTxt(p.due) + ')'; toast('지급 완료로 처리했습니다'); } }
+    if (a === 'paid'){ const s = S.sales.find(x => x.id === id); if (s){ s.status = 'paid'; s.paidOn = todayIso(); move(total(s), s.party + ' 입금'); why = s.party + ' 입금 확인 (' + lateTxt(s.due) + ')'; toast('입금 확인으로 처리했습니다'); } }
+    if (a === 'remind'){ const s = S.sales.find(x => x.id === id); if (s){ s.reminded = (s.reminded || 0) + 1; toast(s.party + '에 독촉 알림을 보냈습니다 (테스트)'); } }
+    if (why) logScores(pre, why);
+    save(); renderAll();
+  }
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (el){ e.preventDefault(); act(el.dataset.act, el); }
+  });
+  dlg.addEventListener('click', e => { if (e.target === dlg) closeDlg(); });
+  dlg.addEventListener('close', () => { if (gate){ const g = gate; gate = null; if (g.to === 'menu' && !arAgreed) location.hash = 'flowpay'; } });
+  dlg.addEventListener('change', e => {
+    if (e.target.name === 'pk'){ const nb = document.getElementById('pickNext'); if (nb){ nb.disabled = false; nb.textContent = '다음: 신청서 작성'; } }
+    if (e.target.id === 'arc1' || e.target.id === 'arc2'){
+      const ok = document.getElementById('arc1').checked && document.getElementById('arc2').checked, btn = document.getElementById('arNext');
+      btn.disabled = !ok; btn.textContent = ok ? '다음 단계' : '두 항목을 확인하면 진행할 수 있습니다';
+    }
+    if (e.target.id && e.target.id.indexOf('lk_') === 0 && curApply){
+      const sid = e.target.id.slice(3);
+      curApply.sel = e.target.checked ? curApply.sel.concat(sid) : curApply.sel.filter(x => x !== sid);
+      openApply(curApply.type, curApply.id); return;
+    }
+    if (e.target.id === 'useM' && curApply){ useM = e.target.checked; openApply(curApply.type, curApply.id); }
+  });
+
+  function bindForm(id, kind){
+    const f = document.getElementById(id);
+    f.due.value = addDays(14);
+    f.addEventListener('submit', e => {
+      e.preventDefault();
+      const rec = { id: uid(), party: f.party.value.trim(), item: f.item.value.trim(), qty: Number(f.qty.value), price: Number(f.price.value), due: f.due.value };
+      if (!rec.party || !rec.item || !(rec.qty > 0) || !(rec.price > 0) || !rec.due) return;
+      const pre = scoreMap();
+      if (kind === 'buy'){ rec.status = 'ordered'; rec.ordered = todayIso(); S.purchases.push(rec); toast(rec.party + '에 발주서를 보냈습니다'); }
+      else { rec.status = 'open'; rec.reminded = 0; rec.tax = 'none'; rec.confirm = 'none'; rec.issued = todayIso(); S.sales.push(rec); }
+      logScores(pre, (kind === 'buy' ? '발주서 입력 (' : '거래명세서 입력 (') + rec.party + ')');
+      f.reset(); f.due.value = addDays(14);
+      save(); renderAll();
+      if (kind !== 'buy'){ openStmt(rec.id); toast('거래명세서를 발행했습니다'); }
+    });
+  }
+
+  document.getElementById('consent').addEventListener('change', e => {
+    S.consent = e.target.checked; save(); renderAll();
+    toast(S.consent ? '서류 보관·재사용에 동의했습니다' : '동의를 철회해 다음 신청부터 서류를 모두 다시 받습니다');
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    S = seed(); save(); applyRole(); renderAll(); route(); toast('시나리오를 처음 상태로 되돌렸습니다');
+  });
+
+  /* ---------- role (고객 ↔ 심사역) ---------- */
+  function applyRole(){
+    const rv = S.role === 'reviewer', b = document.getElementById('roleBtn');
+    document.body.classList.toggle('reviewer', rv);
+    b.classList.toggle('rv', rv);
+    b.textContent = rv ? '⇄ 심사역 화면' : '⇄ 고객 화면';
+    b.title = rv ? '누르면 고객 화면으로 바뀝니다' : '누르면 심사역 화면으로 바뀝니다';
+  }
+  document.getElementById('roleBtn').addEventListener('click', () => {
+    S.role = S.role === 'reviewer' ? 'customer' : 'reviewer'; save(); applyRole();
+    toast(S.role === 'reviewer' ? '심사역 화면으로 바꿨습니다' : '고객 화면으로 바꿨습니다');
+    location.hash = S.role === 'reviewer' ? 'review' : 'flowpay';
+  });
+
+  /* ---------- routing ---------- */
+  const VIEWS = ['home', 'report', 'orders', 'sales', 'score', 'company', 'fund', 'flowpay', 'review'];
+  function route(){
+    if (location.hash === '#review' && S.role !== 'reviewer'){ location.hash = 'home'; return; }
+    const h = location.hash.replace('#', '');
+    const sub = h === 'factoring' ? 'factoring' : 'flowpay';
+    const v = h === 'factoring' ? 'flowpay' : (VIEWS.includes(h) ? h : 'home');
+    VIEWS.forEach(n => document.getElementById('v-' + n).classList.toggle('on', n === v));
+    const navV = v === 'company' ? 'score' : v;
+    document.querySelectorAll('header nav a').forEach(a => { if (a.dataset.v === navV) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    ['flowpay', 'factoring'].forEach(n => document.getElementById('sub-' + n).classList.toggle('on', n === sub));
+    document.querySelectorAll('.subtabs a').forEach(a => { a.classList.toggle('on', a.dataset.sub === sub); if (a.dataset.sub === sub) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    if (v === 'home') renderHome();
+    if (v === 'report') renderReport();
+    if (v === 'score') renderScore();
+    if (v === 'company'){ if (!curCo){ location.hash = 'score'; return; } renderCompany(); }
+    if (v === 'fund') renderFund();
+  }
+  function renderAll(){ renderScore(); renderCompany(); renderFund(); renderHome(); renderReport(); renderOrders(); renderSales(); renderFlowpay(); renderVault(); renderMileage(); renderReview(); }
+  document.querySelectorAll('header nav a').forEach(a => a.addEventListener('click', e => { e.preventDefault(); location.hash = a.dataset.v; }));
+  document.querySelectorAll('.subtabs a').forEach(a => a.addEventListener('click', e => { e.preventDefault(); location.hash = a.dataset.sub; }));
+  // data-act clicks on links shouldn't block normal hash links
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a.btn[href^="#"]');
+    if (a){ e.preventDefault(); location.hash = a.getAttribute('href').slice(1); }
+  });
+  window.addEventListener('hashchange', route);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { renderHome(); renderReport(); });
+
+  load(); applyRole(); bindForm('orderForm', 'buy'); bindForm('saleForm', 'ar'); renderAll(); route();
+})();
+</script>
+</body>
+</html>
