@@ -44,6 +44,24 @@ const { chromium } = require('playwright');
   console.log('review   ', await p.evaluate(() => [location.hash, document.querySelectorAll('.pf-tbl tbody tr').length + ' 고객사 (예시 ' + document.querySelectorAll('.pf-tbl tr.pf-ex').length + ')', document.querySelectorAll('#rvFeed .rv-feed li:not(.empty)').length + ' 이슈', document.querySelectorAll('#rvQueue .ai-rep').length + ' AI 보고서'].join(' | ')));
   await p.evaluate(() => document.querySelector('#rvFeed [data-act="rvActOpen"]').click()); await p.waitForTimeout(150);
   console.log('actsheet ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + document.querySelectorAll('dialog .reasons input').length + ' 유형 | 메모 ' + !!document.getElementById('iaMemo')));
+  // 매입·매출 목록: 줄마다 지금 할 일 버튼 0~1개, 줄을 누르면 상세 시트, "+ 새 거래" 시트에서 입력
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);
+  if (await p.evaluate(() => document.getElementById('dlg').open)) await p.click('#dlgLeft [data-act="close"]');
+  await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
+  console.log('rows     ', await p.evaluate(() => ['orderRows', 'saleRows'].map(id => { const ls = [...document.querySelectorAll('#' + id + ' li.tr-row')]; return id + ' ' + ls.length + '줄, 버튼 최대 ' + Math.max(...ls.map(l => l.querySelectorAll(':scope > button:not(.tr-open)').length)) + '개'; }).join(' | ')));
+  // 할 일 있는 줄이 먼저(날짜순), 끝난 줄은 "완료 N건" 아래 접힘 → 펼치면 보임
+  const fold = async () => p.evaluate(() => ['orderRows', 'saleRows'].map(id => { const f = document.querySelector('#' + id + ' .tr-fold'); return id + ' 보임 ' + [...document.querySelectorAll('#' + id + ' li.tr-row')].filter(l => !l.hidden).length + '줄 · ' + (f ? f.textContent + ' ' + f.getAttribute('aria-expanded') : '접힘 없음') + ' · 첫 줄 ' + document.querySelector('#' + id + ' li.tr-row .tag').textContent; }).join(' | '));
+  console.log('fold     ', await fold());
+  await p.click('#saleRows .tr-fold'); await p.waitForTimeout(100);
+  console.log('unfold   ', (await fold()).split(' | ')[1]);
+  await p.click('#saleRows .tr-fold'); await p.waitForTimeout(100);
+  await p.locator('#saleRows li', { hasText: '연체' }).first().locator('.tr-open').click(); await p.waitForTimeout(150);
+  console.log('detail   ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + [...document.querySelectorAll('#dlgBody .dt-acts button')].map(b => b.textContent + (b.classList.contains('primary') ? '*' : '')).join(', ')));
+  await p.click('#dlgLeft [data-act="close"]');
+  await p.evaluate(() => document.querySelector('#v-sales [data-act="newTrade"]').click()); await p.waitForTimeout(150);
+  await p.fill('#saleForm [name="party"]', '스모크상회'); await p.fill('#saleForm [name="item"]', '시험품'); await p.fill('#saleForm [name="qty"]', '10'); await p.fill('#saleForm [name="price"]', '10000');
+  await p.click('#dlgFoot button[type="submit"]'); await p.waitForTimeout(150);
+  console.log('newsale  ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + document.querySelectorAll('#saleRows li').length + '줄 | ' + [...document.querySelectorAll('#saleRows li')].some(l => l.textContent.includes('스모크상회'))));
   console.log('errors:', errs.length ? errs : 'none');
   await b.close();
 })();

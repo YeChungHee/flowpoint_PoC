@@ -1,0 +1,14 @@
+GitHub 저장소에서 지울 파일 (v5 단순화 기준, 지금 안내서에서 쓰지 않음)
+
+- 지금 docs/img 20장은 모두 안내서에서 쓰므로 새로 안 쓰게 된 캡처는 없습니다.
+- 아래 9장은 예전 안내서(v1~v2) 캡처로, 저장소에서는 지워졌지만 GitHub에 아직 남아 있습니다.
+
+docs/img/01-flowpay-start.png
+docs/img/02-score-start.png
+docs/img/03-sales-start.png
+docs/img/05-apply-dialog.png
+docs/img/06-confirm-wait.png
+docs/img/07-review-queue.png
+docs/img/08-notice-wait.png
+docs/img/09-review-log.png
+docs/img/10-my-score.png

@@ -131,7 +131,7 @@ const csv2 = write('vendor_orders.csv', '매입처\titem\tqty\tunit price\tdue\n
   check(s.scoreLog.some(l => l.why.startsWith('수집함 승인 (')), '점수 변동 기록: ' + (s.scoreLog.find(l => l.why.startsWith('수집함 승인')) || {}).why);
   const left = s.inbox.filter(c => c.status === 'new' || c.status === 'checked');
   check(left.length === 2 && left.every(blocked), '확인 필요 2건(AI 예시·날짜 없는 오렌지유통)은 승인되지 않고 남음');
-  check(await p.locator('#orderRows tr', { hasText: '미래라벨' }).count() >= 2 && await p.locator('#saleRows tr', { hasText: '누리상회, 본점' }).count() === 1, '매입·매출 표에 등록된 거래 표시');
+  check(await p.locator('#orderRows li', { hasText: '미래라벨' }).count() >= 2 && await p.locator('#saleRows li', { hasText: '누리상회, 본점' }).count() === 1, '매입·매출 목록에 등록된 거래 표시');
   // 반려
   await p.locator('#ibList .ib-row', { hasText: '오렌지유통' }).locator('[data-act="ibReject"]').click(); await p.waitForTimeout(150);
   check((await st()).inbox.find(c => c.party === '오렌지유통').status === 'rejected', '대표 반려');

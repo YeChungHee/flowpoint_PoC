@@ -5,10 +5,12 @@ const FILE = 'file://' + process.argv[2];
 const KEY = 'flowpoint-test-v6';
 // 'prompt'(접속 시 승인 창)·'ibedit'(수집함 수정 시트)·'docprev'(거래 문서 미리보기)·'delivery'(납품 확인 시트)는 해시가 아니라 시트를 연 상태
 // 'notif'(알림함 시트)·'thanks'(감사 메일 미리보기, 결제 캘린더의 결제 완료 카드에서)도 시트를 연 상태. 'calendar'는 집행 후 결제 1건이 있는 결제 캘린더
+// 'saledetail'은 #sales에서 연체 줄을 눌러 연 거래 상세 시트, 'newtrade'는 "+ 새 거래" 입력 시트
+// 'fwdsheet'는 집행 후 묶은 매출(한결푸드) 입금 확인 → "오늘 276에 넘길 금액" 시트. #sales는 입금 확인 후 "나중에"(줄에 넘기기), #flowpay는 1건 넘긴 진행률 상태
 // 'actsheet'는 심사 화면(포트폴리오 · 이슈 피드 · AI 검토 보고서)에서 이슈 하나의 '조치 기록' 시트를 연 상태
 // 'dealdetail'은 #deals에서 거래 하나를 연 상태(좁은 화면은 상세만), 'link'는 매입처 외부용 화면(#link/<token>, 1단계 발주서 열람)
-const HASHES = ['home', 'inbox', 'report', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet'];
-const SHEETS = ['prompt', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet'];
+const HASHES = ['home', 'inbox', 'report', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet'];
+const SHEETS = ['prompt', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet'];
 const SIZES = { 1280: 800, 820: 1180, 390: 844 };
 
 // 알고 있는 예외 (실패로 세지 않고 이유와 함께 따로 보여 준다). key는 "점검|선택자" 앞부분과 비교
@@ -215,6 +217,18 @@ async function openHash(p, h){
     await p.reload(); await p.waitForTimeout(150);
     return;
   }
+  if (h === 'saledetail' || h === 'newtrade'){
+    await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
+    await p.evaluate(x => (x === 'newtrade' ? [...document.querySelectorAll('[data-act="newTrade"]')].find(b => b.offsetParent) : [...document.querySelectorAll('#saleRows li')].find(l => l.textContent.includes('연체')).querySelector('.tr-open')).click(), h);
+    await p.waitForTimeout(150);
+    return;
+  }
+  if (h === 'fwdsheet'){
+    await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
+    await p.evaluate(() => [...document.querySelectorAll('#saleRows li.tr-row')].find(l => l.textContent.includes('한결푸드') && l.textContent.includes('상환 매출')).querySelector('.tr-open').click()); await p.waitForTimeout(150);
+    await p.evaluate(() => document.querySelector('#dlgBody [data-act="paid"]').click()); await p.waitForTimeout(150);
+    return;
+  }
   if (h === 'ibedit'){
     await p.evaluate(() => location.hash = 'inbox'); await p.waitForTimeout(120);
     await p.locator('#ibList [data-act="ibEdit"]').last().click(); await p.waitForTimeout(150);
@@ -265,15 +279,16 @@ async function makeReviewState(b){
   if (await p.evaluate(() => document.getElementById('dlg').open)) await p.click('#dlgLeft [data-act="close"]');  // 접속 시 승인 창 닫기
   const next = async () => { await p.click('#dlgFoot [data-act="stepNext"]'); await p.waitForTimeout(120); };
   await p.evaluate(() => location.hash = 'orders'); await p.waitForTimeout(120);
-  await p.locator('#orderRows tr', { hasText: '650개' }).locator('[data-act="finance"]').click(); await p.waitForTimeout(150);
+  await p.locator('#orderRows li', { hasText: '1,573만원' }).locator('[data-act="finance"]').click(); await p.waitForTimeout(150);
   await next();
   await p.locator('dialog label.check', { hasText: '그린마켓' }).locator('input').check(); await p.waitForTimeout(150);
+  await p.locator('#dlg .docrow', { hasText: '440만원' }).locator('input').check(); await p.waitForTimeout(150);  // 묶은 매출 합계 ≥ 납품액
   await next();
   while (await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').count()){ await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').first().click(); await p.waitForTimeout(120); }
   await next();
   await p.click('dialog [data-act="submitApply"]'); await p.waitForTimeout(150);
   await p.evaluate(() => location.hash = 'flowpay'); await p.waitForTimeout(120);
-  await p.click('[data-act="cfm"]'); await p.waitForTimeout(120);
+  while (await p.locator('#apps [data-act="cfm"]').count()){ await p.locator('#apps [data-act="cfm"]').first().click(); await p.waitForTimeout(120); }
   const st = JSON.parse(await p.evaluate(k => localStorage.getItem(k), KEY));
   // 거래 문서 상태: 심사 승인 → 전자서명(매입처 링크 1단계) → 링크 서명·역발행 승인 → 276 지급·발행(납품 확인 대기)
   await p.click('#roleBtn'); await p.waitForTimeout(150);
@@ -290,18 +305,28 @@ async function makeReviewState(b){
   await p.click('#dlDetail [data-act="dlPay"]'); await p.waitForTimeout(100);
   await p.click('#dlDetail [data-act="dlIssue"]'); await p.waitForTimeout(100);
   const ready = JSON.parse(await p.evaluate(k => localStorage.getItem(k), KEY)); ready.role = 'ceo';
-  // 결제 완료 상태(감사 메일): 납품 확인을 마친 것으로 바꾸고 심사역이 상환 완료 처리
-  const paid = JSON.parse(JSON.stringify(ready)), dd = paid.deals[0], t0 = dd.createdAt;
+  // 묶은 매출 입금 확인 → 나중에(줄에 넘기기) → 줄의 넘기기로 1건 넘김 (고객 대표)
+  const closeP = async () => { if (await p.evaluate(() => document.getElementById('dlg').open)) await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(80); };
+  await p.evaluate(([k, s]) => localStorage.setItem(k, s), [KEY, JSON.stringify(ready)]); await p.reload(); await p.waitForTimeout(150); await closeP();
+  await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
+  await p.locator('#saleRows li.tr-row', { hasText: '한결푸드' }).filter({ hasText: '상환 매출' }).locator('.tr-open').click(); await p.waitForTimeout(120);
+  await p.click('#dlgBody [data-act="paid"]'); await p.waitForTimeout(150); await closeP();
+  const later = await p.evaluate(k => localStorage.getItem(k), KEY);
+  await p.click('#saleRows [data-act="fwd"]'); await p.waitForTimeout(150); await p.click('#dlgFoot [data-act="fwdDo"]'); await p.waitForTimeout(150);
+  const fwd1 = await p.evaluate(k => localStorage.getItem(k), KEY);
+  // 결제 완료 상태(감사 메일): 납품 확인을 마치고 묶은 매출을 모두 입금 확인·넘긴 것으로 바꾸면 다시 그릴 때 자동 상환 완료
+  const paid = JSON.parse(JSON.stringify(ready)), dd = paid.deals[0], t0 = dd.createdAt, ap0 = paid.apps[0];
   dd.docs.forEach(x => { if (x.k === 'invC' || x.k === 'dlv'){ x.status = 'done'; x.at = { sent: t0, viewed: t0, signed: t0, done: t0 }; } if (x.k === 'payC'){ x.status = 'due'; x.at = { sent: t0 }; } });
-  paid.role = 'reviewer';
+  ap0.fwd = ap0.alloc.map(r => ({ saleId: r.saleId, amt: r.forward, date: t0 }));
+  paid.sales.forEach(x => { if (ap0.links.includes(x.id)){ x.status = 'paid'; x.paidOn = t0; } });
   await p.evaluate(([k, s]) => localStorage.setItem(k, s), [KEY, JSON.stringify(paid)]); await p.reload(); await p.waitForTimeout(150);
-  await p.evaluate(() => location.hash = 'review'); await p.waitForTimeout(150);
-  await p.click('#rvAfter [data-act="rvOut"][data-r="repaid"]'); await p.waitForTimeout(150);
   const thanksSt = JSON.parse(await p.evaluate(k => localStorage.getItem(k), KEY)); thanksSt.role = 'ceo';
+  if (thanksSt.apps[0].outcome !== 'repaid' || !thanksSt.notifications.some(n => n.type === 'thanks')) throw new Error('자동 상환 완료 상태를 만들지 못함');
   await ctx.close();
   st.role = 'reviewer';
   return { review: JSON.stringify(st), link: signSt, deals: JSON.stringify(ready), dealdetail: JSON.stringify(ready), docprev: JSON.stringify(ready), delivery: JSON.stringify(ready),
-    actsheet: JSON.stringify(st), calendar: JSON.stringify(ready), notif: JSON.stringify(thanksSt), thanks: JSON.stringify(thanksSt) };
+    actsheet: JSON.stringify(st), calendar: JSON.stringify(ready), notif: JSON.stringify(thanksSt), thanks: JSON.stringify(thanksSt),
+    fwdsheet: JSON.stringify(ready), sales: later, flowpay: fwd1 };
 }
 
 async function newPage(b, opt, state){
@@ -369,7 +394,7 @@ async function zoomPass(b, reviewState){
   }
 }
 
-async function keyboardPass(b){
+async function keyboardPass(b, reviewState){
   const C = '키보드 1280 라이트';
   // (1) #home에서 Tab 40번: 포커스 표시가 보이는지, 테두리 대비 3:1 이상인지
   {
@@ -397,7 +422,7 @@ async function keyboardPass(b){
   {
     const { ctx, p } = await newPage(b, { w: 1280, h: 800 });
     await p.evaluate(() => location.hash = 'orders'); await p.waitForTimeout(150);
-    await p.locator('#orderRows tr', { hasText: '650개' }).locator('[data-act="finance"]').click(); await p.waitForTimeout(150);
+    await p.locator('#orderRows li', { hasText: '1,573만원' }).locator('[data-act="finance"]').click(); await p.waitForTimeout(150);
     const step = () => p.evaluate(() => { const s = document.querySelector('#dlg .stepbar'); return s ? +s.getAttribute('aria-valuenow') : 0; });
     count('keys', 5);
     if (!(await p.evaluate(() => document.getElementById("dlg").open))) fail('keys', 'sheet-open', '신청 시트가 열리지 않음', C);
@@ -428,17 +453,35 @@ async function keyboardPass(b){
     await p.keyboard.press('ArrowLeft'); await p.waitForTimeout(120);
     const seg2 = await p.evaluate(() => document.querySelector('#scSeg [aria-pressed="true"]').dataset.sc);
     if (seg2 !== 'me') fail('keys', 'seg-left', '왼쪽 화살표로 우리 회사로 돌아가지 않음 (' + seg2 + ')', C);
-    // 작업 "더 보기" 메뉴: Esc로 닫기
-    await p.evaluate(() => location.hash = 'orders'); await p.waitForTimeout(150);
-    const menu = p.locator('#orderRows details.menu > summary').first();
-    if (await menu.count()){
-      count('keys', 1);
-      await menu.focus(); await p.keyboard.press('Enter'); await p.waitForTimeout(80);
-      const opened = await p.evaluate(() => !!document.querySelector('details.menu[open]'));
-      await p.keyboard.press('Escape'); await p.waitForTimeout(80);
-      const still = await p.evaluate(() => !!document.querySelector('details.menu[open]'));
-      if (!opened || still) fail('keys', 'menu-esc', '작업 더 보기 메뉴가 Enter로 열리고 Esc로 닫히지 않음', C);
-    }
+    // 매출 목록: 줄(업체)에서 Enter → 상세 시트(포커스는 시트 안), Esc → 닫히고 그 줄로 포커스가 돌아옴
+    await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
+    count('keys', 2);
+    const row = p.locator('#saleRows li', { hasText: '연체' }).first().locator('.tr-open');
+    const rid = await row.getAttribute('data-id');
+    await row.focus(); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const dOpen = await p.evaluate(() => document.getElementById('dlg').open && !!document.activeElement.closest('dialog'));
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const dBack = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.dataset.act === 'saleOpen' ? document.activeElement.dataset.id : null);
+    if (!dOpen || dBack !== rid) fail('keys', 'detail-esc', '거래 상세 시트가 Enter로 열리고 Esc로 닫힌 뒤 그 줄로 포커스가 돌아오지 않음', C);
+    // "+ 새 거래"(툴바): Enter → 입력 시트(첫 칸에 포커스), Esc → 닫히고 버튼으로 포커스가 돌아옴
+    await p.focus('#tbAct'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const nOpen = await p.evaluate(() => document.getElementById('dlg').open && document.activeElement.name === 'party');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const nBack = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.id === 'tbAct');
+    if (!nOpen || !nBack) fail('keys', 'newtrade-esc', '새 거래 시트가 Enter로 열리고(첫 칸 포커스) Esc로 닫힌 뒤 버튼으로 포커스가 돌아오지 않음', C);
+    await ctx.close();
+  }
+  // (2-1) 넘길 금액 시트: 열리면 "276에 넘기기"에 포커스, Esc(나중에)로 닫히면 그 매출 줄로 포커스가 돌아옴. "완료 N건" 펼침은 Enter로 열고 닫음
+  {
+    const { ctx, p } = await newPage(b, { w: 1280, h: 800 }, reviewState.fwdsheet);
+    await openHash(p, 'fwdsheet'); count('keys', 2);
+    const foc = await p.evaluate(() => document.getElementById('dlg').open && document.activeElement.dataset.act);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const back = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.dataset.act);
+    if (foc !== 'fwdDo' || back !== 'saleOpen') fail('keys', 'fwd-esc', '넘길 금액 시트 포커스(' + foc + ')·Esc 후 줄 포커스(' + back + ')가 맞지 않음', C);
+    await p.focus('#saleRows .tr-fold'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const fo = await p.evaluate(() => [document.activeElement.classList.contains('tr-fold'), document.activeElement.getAttribute('aria-expanded'), document.querySelectorAll('#saleRows li.tr-done[hidden]').length]);
+    if (!fo[0] || fo[1] !== 'true' || fo[2] !== 0) fail('keys', 'fold-enter', '"완료 N건" 펼침이 Enter로 열리지 않거나 포커스를 잃음 (' + fo + ')', C);
     await ctx.close();
   }
   // (3) 휴대폰: 거래 세그먼트 화살표, 더보기 시트 Esc
@@ -522,7 +565,7 @@ async function mediaPass(b){
   await auditPass(b, { w: 1280, h: 800, scheme: 'dark', contrast: 'more' }, reviewState, '1280 dark 고대비');
   await auditPass(b, { w: 1280, h: 800, scheme: 'light', forced: 'active' }, reviewState, '1280 forced-colors');
   await zoomPass(b, reviewState);
-  await keyboardPass(b);
+  await keyboardPass(b, reviewState);
   await mediaPass(b);
   await b.close();
 
