@@ -47,6 +47,7 @@ const SHOT = process.argv[3];
   const feedTags = async () => (await p.locator('#rvFeed .rv-feed .flags .tag:first-child').allTextContents());
   const day = async () => (await p.textContent('#dayLabel')).trim();
   // 점검: 조건이 틀리면 NG를 찍고 끝에서 종료 코드 1 (기록만 하던 단계 5 확인을 실제 점검으로)
+  const manT0 = x => Math.round(x.qty * x.price * 1.1 / 10000).toLocaleString('ko-KR') + '만원';
   const fails = [];
   const expect = (name, cond, got) => { if (cond) console.log('  ok', name); else { fails.push(name); console.log('  NG', name, '| got:', typeof got === 'string' ? got : JSON.stringify(got)); } };
   // 테스트 날짜 표시: 처음 날짜 + n일 → "11월 9일" / "2026-11-09" (앱과 같은 로컬 날짜)
@@ -95,26 +96,258 @@ const SHOT = process.argv[3];
   await go('flowpay');
   console.log('my score:', await p.textContent('#score'), '|', (await p.textContent('#limitNote')).replace(/\s+/g, ' '));
 
-  // 1. 수집함: 담당자가 확인(날짜 빠진 건은 수정) → 대표가 일괄 승인 → 매입·매출에 등록
+  // 0-0. 세금계산서 자동 수집·짝짓기 (시작 시나리오, 점검 뒤 원래 기록으로 되돌림)
+  //   같은 거래처 + 같은 구분 + 합계 금액 같음 → 가장 오래된 열린 거래에 자동 연결(승인 항목 아님), 맞는 거래 없으면 새 거래 후보.
+  //   계산서가 들어오기 전과 뒤의 한결푸드 352만원 줄, 다시 돌려도 두 번 붙지 않음, 매입 계산서 → 미래라벨 줄이 직접 결제로
+  { const snap0 = await p.evaluate(() => localStorage.getItem('flowpoint-test-v6')), S0 = await st();
+    const inv = S0.inbox.find(c => c.doc === 'tax' && c.party === '한결푸드'), ml = S0.inbox.find(c => c.doc === 'tax' && c.party === '미래라벨'), og = S0.inbox.find(c => c.doc === 'tax' && c.party === '오렌지유통');
+    const hs = S0.sales.find(x => x.id === inv.refId), mp = S0.purchases.find(x => x.id === ml.refId);
+    console.log('tax invoices:', S0.inbox.filter(c => c.doc).map(c => c.party + ' ' + c.amt + ' ' + c.status + (c.refId ? ' → ' + c.dealOn : '')).join(' / '), '| log', S0.scoreLog.map(l => l.target + ' ' + l.before + '→' + l.after + ' (' + l.why + ')').join(', '));
+    expect('불러올 때 짝짓기: 한결푸드 352만원 → 기한 지난 미발행 매출(발행, 오늘), 미래라벨 198만원 → 납품 전 매입(계산서 받음), 오렌지유통 678만원 → 새 거래 후보',
+      inv.status === 'linked' && hs && hs.party === '한결푸드' && hs.qty === 160 && hs.tax === 'issued' && hs.taxOn === isoAt(0) && hs.taxRef === inv.id && inv.wasLate === true &&
+      ml.status === 'linked' && mp && mp.status === 'ordered' && mp.taxIn === 'received' && mp.delivery === 'before' && og.status === 'new' && !og.refId && og.flags.due === 'missing', { inv, og: og.status, mp });
+    await go('inbox');
+    const ibTxt = (await p.locator('#ibList').innerText()).replace(/\s+/g, ' ');
+    expect('수집함: "자동 연결 · 한결푸드 352만원 계산서 · 연결됨" (승인 줄 아님) · 오렌지유통 "새 거래 후보"', /자동 연결 한결푸드 352만원 계산서 연결됨/.test(ibTxt) && (await p.locator('#ibList .ib-link').count()) === 2 &&
+      (await p.locator('#ibList .ib-row', { hasText: '한결푸드' }).count()) === 0 && (await p.locator('#ibList .ib-row', { hasText: '새 거래 후보' }).filter({ hasText: '오렌지유통' }).count()) === 1, ibTxt.slice(0, 200));
+    if (SHOT) { await top(); await shot('01e-inbox-link'); }
+    // 한결푸드 352만원 줄: 계산서가 들어오기 전(기한 지남 · 계산서 발행 버튼) → 들어온 뒤(발행 · 버튼 없음, 입금 완료라 완료로 접힘)
+    const row352 = () => p.evaluate(id => { const l = [...document.querySelectorAll('#saleRows li.tr-row')].find(x => x.querySelector('.tr-open').dataset.id === id); const b = l.querySelector('button.small');
+      return l.querySelector('.tr-st').innerText.replace(/\s+/g, ' ') + ' [' + (b ? b.dataset.act + ' ' + b.textContent : '없음') + ']' + (l.hidden ? ' 접힘' : ''); }, hs.id);
+    const fresh = Object.assign({}, inv, { status: 'arrived' }); ['refId', 'dealOn', 'doneOn', 'wasLate'].forEach(k => delete fresh[k]);
+    await p.evaluate(([id, sid]) => { const k = 'flowpoint-test-v6', s = JSON.parse(localStorage.getItem(k)); s.inbox = s.inbox.filter(x => x.id !== id); const x = s.sales.find(y => y.id === sid); x.tax = 'none'; delete x.taxOn; delete x.taxRef; s.scoreLog = []; localStorage.setItem(k, JSON.stringify(s)); }, [inv.id, hs.id]);
+    await p.reload(); await p.waitForTimeout(150); await closePrompt(); await go('sales');
+    const r0 = await row352();
+    await p.evaluate(c => { const k = 'flowpoint-test-v6', s = JSON.parse(localStorage.getItem(k)); s.inbox.push(c); localStorage.setItem(k, JSON.stringify(s)); }, fresh);
+    await p.reload(); await p.waitForTimeout(150); await closePrompt(); await go('sales');
+    const r1 = await row352(), S1 = await st(), h1 = S1.sales.find(x => x.id === hs.id);
+    await p.evaluate(id => { const l = [...document.querySelectorAll('#saleRows .tr-open')].find(b => b.dataset.id === id); l.click(); }, hs.id); await p.waitForTimeout(150);
+    const dTax = (await p.locator('#dlgBody .dt-kv').innerText()).replace(/\s+/g, ' '); await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(100);
+    console.log('한결푸드 352만원 줄: 계산서 전', r0, '→ 들어온 뒤', r1, '| 상세', dTax.match(/세금계산서 \S+ \S+/)[0], '| log', S1.scoreLog.map(l => l.target + ' ' + l.before + '→' + l.after + ' (' + l.why + ')').join(', '));
+    expect('자동 연결이 한결푸드 352만원 줄을 바꿈: 계산서 기한 지남 [계산서 발행] → 계산서 발행(입금 완료) · 버튼 없음', r0 === '계산서 기한 지남 [tax 계산서 발행]' && r1 === '입금 완료 [없음] 접힘' && h1.tax === 'issued' && h1.taxOn === isoAt(0) && dTax.includes('세금계산서 발행 완료'), { r0, r1, dTax });
+    // 다시 돌려도(다시 불러오기 2번 · 같은 계산서를 새로 들어온 것처럼 되돌려도) 두 번 붙지 않음
+    const linkLog = s => s.scoreLog.filter(l => l.why.includes('자동 연결')).length;
+    await p.reload(); await p.waitForTimeout(120); await p.reload(); await p.waitForTimeout(120); await closePrompt();
+    await p.evaluate(id => { const k = 'flowpoint-test-v6', s = JSON.parse(localStorage.getItem(k)); s.inbox.find(x => x.id === id).status = 'arrived'; localStorage.setItem(k, JSON.stringify(s)); }, inv.id);
+    await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    const S2 = await st(), i2 = S2.inbox.find(c => c.id === inv.id), linked2 = S2.sales.filter(x => x.taxRef === inv.id);
+    console.log('re-run:', i2.status, '| 연결된 거래', linked2.length, '| 자동 연결 기록', linkLog(S1), '→', linkLog(S2), '| 한결 발행', S2.sales.filter(x => x.party === '한결푸드' && x.tax === 'issued').length, '| 후보', S2.inbox.filter(c => c.status === 'new').length);
+    expect('다시 짝짓기를 돌려도 같은 계산서는 한 번만 연결 (같은 거래 · 기록 1건 · 새 후보 없음)', i2.status === 'linked' && i2.refId === hs.id && linked2.length === 1 && linkLog(S1) >= 1 && linkLog(S2) === linkLog(S1) &&
+      S2.sales.filter(x => x.party === '한결푸드' && x.tax === 'issued').length === S1.sales.filter(x => x.party === '한결푸드' && x.tax === 'issued').length && S2.inbox.filter(c => c.status === 'new').length === S1.inbox.filter(c => c.status === 'new').length, { i2: i2.status, linked2: linked2.length, l1: linkLog(S1), l2: linkLog(S2) });
+    // 매입 계산서(미래라벨 198만원 · 납품 전) → 계산서 받음 → 줄 버튼 직접 결제 (부족일 12월 1일 뒤 결제라 부족 해결 비교에는 원래 없음)
+    await go('orders');
+    const rMl = await p.evaluate(id => { const l = [...document.querySelectorAll('#orderRows li.tr-row')].find(x => x.querySelector('.tr-open').dataset.id === id); const b = l.querySelector('button.small'); return l.querySelector('.tr-st').innerText.replace(/\s+/g, ' ') + ' [' + (b ? b.dataset.act + ' ' + b.textContent : '없음') + ']'; }, mp.id);
+    console.log('미래라벨 198만원(매입 계산서 받음):', rMl, '| 결제일', mp.due);
+    expect('매입 계산서 자동 연결: 미래라벨 198만원 줄 납품 전 · 계산서 받음 → 직접 결제', rMl === '납품 전 · 계산서 받음 [pay 직접 결제]', rMl);
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt(); }
+
+  // 0-1. 부족 해결 비교 (시작 시나리오, 점검 뒤 원래 기록으로 되돌림)
+  //   부족 날짜 하나(시작일 · D-n)가 홈·자금일보·알림에서 같고, 각 후보의 "해결"이 이 점검에서 따로 다시 계산한 30일 예측과 같으며,
+  //   부족일 전 입금 채권은 해결 안 됨, 주의 거래처(브라이트몰)는 추천 안 됨, 추천은 해결하는 것 중 가장 싼 하나, 추천 버튼은 맞는 신청 시트·대상으로
+  { const snap0 = await p.evaluate(() => localStorage.getItem('flowpoint-test-v6'));
+    const dOf = s => { const [y, m, d] = s.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - dAt(0)) / 864e5); };
+    const tot = x => Math.round(x.qty * x.price * 1.1), manT = v => Math.round(v / 10000).toLocaleString('ko-KR') + '만원';
+    // 독립 다시 계산: 결제 예정 매입(결제일, 지난 건 오늘) · 입금 전 매출(입금 예정일, 연체 제외)만 있는 시작 시나리오
+    const sim = (S0, drop, add) => { const ev = [];
+      S0.purchases.forEach(x => { if (x.status === 'ordered' && x.id !== drop) ev.push([Math.max(0, dOf(x.due)), -tot(x)]); });
+      S0.sales.forEach(x => { if (x.status === 'open' && dOf(x.due) >= 0 && x.id !== drop) ev.push([dOf(x.due), tot(x)]); });
+      ev.push(...add); const bal = []; let b = S0.cash; for (let d = 0; d <= 30; d++){ b += ev.filter(e => e[0] === d).reduce((t, e) => t + e[1], 0); bal.push(b); } return bal; };
+    const S0 = await st(), base = sim(S0, null, []), start = base.findIndex(v => v < 0), want = mdAt(start) + '부터 · D-' + start;
+    const sheetRows = () => p.locator('#dlgBody .sf-opt').evaluateAll(ds => ds.map(d => ({ k: d.dataset.k, id: d.dataset.id, res: d.dataset.resolves === '1', cost: +d.dataset.cost, low: d.dataset.low === '' ? null : +d.dataset.low,
+      sel: d.dataset.sel ? d.dataset.sel.split(',') : null, tier: d.dataset.tier ? +d.dataset.tier : null, rec: d.dataset.rec === '1', st: d.querySelector('.sf-t .tag:last-child').textContent, txt: d.innerText.replace(/\s+/g, ' ') })));
+    const fpRate = { 30: 0.033, 60: 0.066, 90: 0.1 }, mile = S0.mileage.reduce((a, m) => a + m.amt, 0);
+    // 행마다 독립 다시 계산: 플로우페이 = 매입 결제 빼고 묶은 매출 넘김(입금 예정일 순) 더함 / 먼저 받기 = 그 입금을 오늘(금액 − 비용)으로
+    const check = (S1, rows) => rows.map(r => {
+      if (r.k === 'fp'){
+        const x = S1.purchases.find(y => y.id === r.id); if (r.low == null) return { r, low: null, ok: !r.res };
+        const bs = x.qty * x.price, sup = Math.round(bs * (1 + fpRate[r.tier])), totF = sup + Math.round(sup * 0.1), repay = totF - Math.min(mile, totF);
+        let rest = repay; const add = r.sel.map(i => S1.sales.find(y => y.id === i)).sort((a, b) => a.due < b.due ? -1 : 1).map(s => { const f = Math.max(0, Math.min(tot(s), rest)); rest -= f; return [dOf(s.due), -f]; }).filter(e => e[1] < 0 && e[0] >= 0);
+        const low = Math.min(...sim(S1, x.id, add));
+        return { r, low, ok: r.res === (low >= 0) && Math.round(low) === r.low && r.cost === sup - bs };
+      }
+      const s = S1.sales.find(y => y.id === r.id), cost = Math.round(tot(s) * 0.012 * dOf(s.due) / 30), low = Math.min(...sim(S1, s.id, [[0, tot(s) - cost]]));
+      return { r, low, ok: r.res === (low >= 0) && Math.round(low) === r.low && r.cost === cost };
+    });
+    // 홈: 부족 카드 · 오늘 할 일 첫 줄 · 플로우페이 가능 · 먼저 받기 가능
+    await go('home');
+    const hmDate = (await p.textContent('#hmShort .sf-date')).trim(), sig0 = (await sigRows()).split(' / ')[0];
+    const hmFp = (await p.textContent('#hmFp')).trim(), hmAr = (await p.textContent('#hmAr')).trim();
+    const fpSales = S0.sales.filter(x => x.status === 'open' && x.tax !== 'issued').reduce((a, x) => a + tot(x), 0);
+    const arSum = S0.sales.filter(x => x.status === 'open' && x.tax === 'issued' && x.delivery === 'done' && dOf(x.due) >= 0 && x.party !== '브라이트몰').reduce((a, x) => a + tot(x), 0);
+    console.log('shortfall: start', start, mdAt(start), '| low', Math.min(...base), '| home', hmDate, '|', await p.textContent('#hmShort .hm-val'), '| todo', sig0, '| 플로우페이 가능', hmFp, '| 먼저 받기 가능', hmAr);
+    expect('홈 오늘 할 일 첫 줄: N만원 부족 · 시작일 [부족 해결*] (매입을 바로 겨누지 않음)', sig0 === manT(-Math.min(...base)) + ' 부족 · ' + want + ' [부족 해결*]' && !(await p.locator('#sigBox [data-act="finance"]').count()), sig0);
+    expect('홈 플로우페이 가능 = min(한도 남은, 묶을 수 있는 미발행 매출) · 먼저 받기 가능 = 발행 채권(주의 제외)', hmFp === manT(fpSales) && hmAr === manT(arSum), { hmFp, fpSales, hmAr, arSum });
+    // 시트(홈에서 열기)
+    await p.click('#sigBox [data-act="shortSheet"]'); await p.waitForTimeout(150);
+    const hero = (await p.locator('#sfHero').innerText()).replace(/\s+/g, ' ');
+    let R = await sheetRows(); const C1 = check(S0, R);
+    console.log('sheet(home):', await p.textContent('#dlgTitle'), '|', hero, '| focus', await p.evaluate(() => document.activeElement.dataset.act || document.activeElement.className));
+    R.forEach(r => console.log('   ', r.rec ? '*' : ' ', r.k, r.txt, '| resolves', r.res, 'low', r.low));
+    // 계산서 수집(한결푸드 352만원 발행 · 미래라벨 198만원 계산서 받음) 뒤에도 부족 해결 비교는 단계 4와 같음 (후보 · 해결 여부 · 비용 · 최저 잔고 · 추천)
+    const sig = R.map(r => [r.k, r.txt.replace(/^추천 /, '').split(' ').slice(0, 2).join(' '), r.res, r.cost, r.low, r.rec ? '*' : ''].join('|'));
+    const SIG4 = ['fp|세진화학 550만원|true|165000|1860000|*', 'fp|대성원료 1,573만원|true|471900|6920000|', 'ar|그린마켓 660만원|false|7920|-2327920|', 'ar|오렌지유통 726만원|false|29040|-2349040|',
+      'ar|누리상회 330만원|false|19800|-2339800|', 'ar|브라이트몰 303만원|true|30250|674750|', 'ar|그린마켓 1,241만원|true|124080|9963920|'];
+    expect('계산서 자동 연결 뒤에도 부족 해결 비교 그대로 (7개 후보 · 추천 세진화학 550만원 · 미래라벨 없음)', sig.join() === SIG4.join() && !R.some(r => r.txt.includes('미래라벨')), sig);
+    expect('부족 해결 시트: 홈 오늘 할 일에서 열림 · 부족 날짜 하나', await dlgOpen() && (await p.textContent('#dlgTitle')) === '부족 해결' && hero.startsWith(want) && hero.includes(manT(-Math.min(...base)) + ' 부족'), hero);
+    expect('후보마다 "해결"이 독립 다시 계산(30일 최저 ≥ 0)과 같음 · 비용 같음', C1.length >= 5 && C1.every(c => c.ok), C1.filter(c => !c.ok).map(c => [c.r.txt, c.r.low, c.low]));
+    const early = R.filter(r => r.k === 'ar' && dOf(S0.sales.find(y => y.id === r.id).due) <= start);
+    expect('부족일 전 입금 채권은 해결 안 됨 · 부족일 전 입금', early.length === 3 && early.every(r => !r.res && r.st === '해결 안 됨' && r.txt.includes('부족일 전 입금')), early.map(r => r.txt));
+    const bm = R.find(r => r.txt.startsWith('브라이트몰'));
+    expect('브라이트몰: 주의 거래처 · 심사 필요, 추천 아님', bm && bm.st === '주의 거래처 · 심사 필요' && !bm.rec, bm);
+    const elig = rs => rs.filter(r => r.res && r.st === '해결'), rec = R.find(r => r.rec);
+    expect('추천 = 해결하는 것 중 가장 싼 하나 (채움 버튼 1개)', rec && rec.cost === Math.min(...elig(R).map(r => r.cost)) && (await p.locator('#dlg button.primary').count()) === 1 && rec.txt.startsWith('추천 세진화학'), rec);
+    if (SHOT) await shot('01a-shortfall-sheet');
+    // 추천 버튼 → 플로우페이 신청(세진화학) · 2단계에 부족 시작일 뒤 매출(그린마켓)이 미리 묶여 있음
+    await p.click('#dlgBody [data-act="shortGo"]'); await p.waitForTimeout(150);
+    const apT = await p.textContent('#dlgTitle'), apKv = (await p.locator('#dlgBody .kv').innerText()).replace(/\s+/g, ' ');
+    await next(); const pre = await p.locator('#dlgBody input[id^="lk_"]:checked').evaluateAll(xs => xs.map(x => x.id.slice(3)));
+    console.log('rec → apply:', apT, '|', apKv.slice(0, 30), '| preselected', pre.map(i => S0.sales.find(y => y.id === i).party + ' ' + manT(tot(S0.sales.find(y => y.id === i)))).join(', '), '|', (await p.locator('#fpCover').innerText()).replace(/\s+/g, ' '));
+    expect('추천 버튼 → 플로우페이 신청 · 대상 세진화학 · 묶음 = 추천 계산의 묶음', apT === '플로우페이 신청' && apKv.includes('세진화학') && pre.join() === rec.sel.join() && (await p.locator('#dlgBody .sum', { hasText: '충분' }).count()) === 1, { apT, pre, sel: rec.sel });
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const back = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.dataset.act);
+    expect('Esc로 닫으면 연 버튼(부족 해결)으로 포커스', back === 'shortSheet', back);
+    // 자금일보 알림에서 열기 · 같은 날짜
+    await go('report');
+    const rpDate = (await p.textContent('#sfCallout .sf-date')).trim();
+    await p.click('#sfCallout [data-act="shortSheet"]'); await p.waitForTimeout(150);
+    const fromRp = await dlgOpen() && (await p.textContent('#dlgTitle')) === '부족 해결';
+    await p.keyboard.press('Escape'); await p.waitForTimeout(120);
+    await p.evaluate(() => document.querySelector('[data-act="ntOpen"]').click()); await p.waitForTimeout(150);
+    const ntDate = (await p.textContent('#ntShort .sf-date')).trim();
+    console.log('dates: home', hmDate, '| report', rpDate, '| notif', ntDate, '| want', want);
+    expect('부족 해결 시트: 자금일보 알림에서 열림', fromRp, fromRp);
+    expect('홈·자금일보·알림의 부족 날짜가 같음', hmDate === want && rpDate === want && ntDate === want && sig0.includes(want), { hmDate, rpDate, ntDate });
+    // 알림의 "부족 해결" → 시트, 그린마켓 1,241만원 계산서 발행 → 먼저 받기 후보, 가장 싸면 추천이 바뀜
+    await p.click('#ntShort [data-act="shortSheet"]'); await p.waitForTimeout(150);
+    const gm = S0.sales.find(x => x.party === '그린마켓' && x.tax !== 'issued');
+    await p.click('#dlgBody .sf-opt[data-id="' + gm.id + '"] [data-act="tax"]'); await p.waitForTimeout(150);
+    const S2 = await st(); R = await sheetRows(); const C2 = check(S2, R), rec2 = R.find(r => r.rec), g2 = R.find(r => r.id === gm.id);
+    console.log('after 그린마켓 1,241 발행:', S2.sales.find(x => x.id === gm.id).tax, '| still open', await dlgOpen());
+    R.forEach(r => console.log('   ', r.rec ? '*' : ' ', r.k, r.txt, '| resolves', r.res, 'low', r.low));
+    expect('그린마켓 1,241만원 발행 후: 먼저 받기 후보(해결) · 해결 여부 독립 계산과 같음', g2 && g2.st === '해결' && g2.res && C2.every(c => c.ok), { g2, bad: C2.filter(c => !c.ok).map(c => [c.r.txt, c.r.low, c.low]) });
+    expect('추천이 가장 싼 해결 방법(그린마켓 1,241만원 먼저 받기)으로 바뀜', rec2 && rec2.cost === Math.min(...elig(R).map(r => r.cost)) && rec2.id === gm.id && rec2.k === 'ar', rec2);
+    expect('발행 전 추천(플로우페이)은 발행 후 해결 안 됨 · 채움 버튼은 여전히 1개', R.some(r => r.id === rec.id && !r.res && !r.rec) && (await p.locator('#dlg button.primary').count()) === 1, R.find(r => r.id === rec.id));
+    if (SHOT) await shot('01b-shortfall-after-tax');
+    await p.click('#dlgBody [data-act="shortGo"]'); await p.waitForTimeout(150);
+    const arT = await p.textContent('#dlgTitle'), arSum0 = (await p.locator('#dlgBody .sum').first().innerText()).replace(/\s+/g, ' ');
+    console.log('rec → apply:', arT, '|', arSum0);
+    expect('추천 버튼 → 유동화 신청 · 대상 그린마켓 1,241만원', arT === '유동화 신청' && arSum0.includes('그린마켓') && arSum0.includes('1,241만원'), arSum0);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(120);
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+
+    // 0-2. 자금일보 보고서형: 기준 줄(전일 대비) · 탭 전환(누르기·화살표·기억) · 두 줄 예측 · 받을 돈 나이 막대 · 거래처 쏠림 (시작 시나리오, 독립 계산과 비교)
+    await go('report');
+    const selTab = () => p.evaluate(() => [...document.querySelectorAll('#reportBody [role="tab"]')].filter(t => t.getAttribute('aria-selected') === 'true').map(t => t.dataset.tab + (document.getElementById(t.getAttribute('aria-controls')).hidden ? '(hidden)' : '')).join());
+    const shown = () => p.evaluate(() => [...document.querySelectorAll('#reportBody [role="tabpanel"]')].filter(x => !x.hidden).map(x => x.id).join());
+    const net = S0.log.filter(l => l.date === isoAt(-1)).reduce((a, l) => a + l.amt, 0), netT = (net > 0 ? '+' : net < 0 ? '−' : '') + manT(Math.abs(net));
+    const src = (await p.textContent('#rpSrc')).replace(/\s+/g, ' ').trim();
+    console.log('report top line:', src, '| cards', (await p.locator('#rpCards .rp-card').allInnerTexts()).map(t => t.replace(/\s+/g, ' ')).join(' / '));
+    const dayLine = await p.evaluate(() => { const d = document.querySelector('#rpSrc .rp-day'); return d && getComputedStyle(d).display === 'block' && getComputedStyle(d).whiteSpace === 'nowrap'; });
+    expect('자금일보 기준 줄: 오늘 08:00 기준 · 은행 잔고(연동 예정) / 전일 대비(어제 입출금 합계)는 한 덩어리로 다음 줄', src === mdAt(0) + ' 08:00 기준 · 은행 잔고(연동 예정) 전일 대비 ' + netT && dayLine, { src, netT, dayLine });
+    const rpSf = (await p.textContent('#sfCallout .sf-date')).trim(), rpSum = (await p.textContent('#rpSum')).replace(/\s+/g, ' ');
+    const svg = await p.locator('#chart2').evaluate(s => ({ sure: s.dataset.sure.split(',').map(Number), cons: s.dataset.cons.split(',').map(Number), sfDay: +s.dataset.sfDay, label: s.getAttribute('aria-label') }));
+    console.log('report summary:', rpSum, '| chart sf day', svg.sfDay, '|', (await p.textContent('#rpCons')).trim());
+    expect('자금일보 부족 날짜 = 홈 부족 날짜 (알림·요약 문장·차트 세로선)', rpSf === hmDate && rpSum.includes('부족 ' + want) && svg.sfDay === start && !/\d+일 뒤 잔고가/.test(rpSum), { rpSf, hmDate, rpSum, sfDay: svg.sfDay });
+    // 보수 줄: 확실(독립 다시 계산) − 브라이트몰(주의) 들어올 돈 → 입금 예정일 전에는 같고, 그날부터 그 금액만큼 낮음
+    const bmS = S0.sales.find(x => x.party === '브라이트몰' && x.status === 'open' && dOf(x.due) >= 0), bmDay = dOf(bmS.due), bmAmt = tot(bmS);
+    const sureOk = svg.sure.every((v, d) => v === Math.round(base[d]));
+    const consOk = svg.cons.every((v, d) => d < bmDay ? v === svg.sure[d] : v === svg.sure[d] - bmAmt);
+    console.log('two lines: 확실 min', manT(Math.min(...svg.sure)), '| 보수 min', manT(Math.min(...svg.cons)), '| 브라이트몰', manT(bmAmt), '+' + bmDay);
+    expect('확실 줄 = 독립 다시 계산한 30일 예측', sureOk, svg.sure);
+    expect('보수 줄 최저 ≤ 확실 줄 최저 · 브라이트몰 입금일(+' + bmDay + ') 전 같고 그날부터 다름(−' + manT(bmAmt) + ')', Math.min(...svg.cons) <= Math.min(...svg.sure) && consOk && svg.cons[bmDay] !== svg.sure[bmDay] && svg.cons[bmDay - 1] === svg.sure[bmDay - 1], { cons: svg.cons });
+    expect('차트 설명(aria-label)에 두 줄 수치', svg.label.includes('확실') && svg.label.includes('보수') && /\d/.test(svg.label), svg.label);
+    expect('요약: 오늘 챙길 일 줄마다 버튼 1개 · 최대 3줄 · "7일 안의 결제 예정" 없음 · 채움 버튼 1개', await p.locator('#rpTodo li').evaluateAll(ls => ls.length <= 3 && ls.every(l => l.querySelectorAll('button').length === 1)) &&
+      !(await p.locator('#reportBody', { hasText: '7일 안의 결제 예정' }).count()) && (await p.locator('#rpPanel-sum button.primary, #rpPanel-sum button.hot').count()) === 1, await p.locator('#rpTodo li').allInnerTexts());
+    // 탭: 누르기 → 받을 돈, 오른쪽 화살표 → 줄 돈(포커스 따라감), 다시 불러와도 줄 돈(보는 사람별 기억), Home → 요약
+    await p.click('#rpTab-ar'); await p.waitForTimeout(120);
+    const t1 = await selTab(), s1 = await shown();
+    const arTot = await p.locator('#rpArTot').evaluate(e => +e.dataset.amt), ageAmts = await p.locator('#rpAge i').evaluateAll(is => is.map(i => +i.dataset.amt));
+    const open = S0.sales.filter(x => x.status === 'open'), openTot = open.reduce((a, x) => a + tot(x), 0);
+    const bucket = x => dOf(x.due) < 0 ? 2 : -dOf(x.issued) <= 30 ? 0 : 1, want3 = [0, 1, 2].map(k => open.filter(x => bucket(x) === k).reduce((a, x) => a + tot(x), 0)).filter(v => v);
+    const byP = {}; open.forEach(x => { byP[x.party] = (byP[x.party] || 0) + tot(x); });
+    const top3 = Object.entries(byP).sort((a, b) => b[1] - a[1]).slice(0, 3), topPct = Math.round(top3.reduce((a, x) => a + x[1], 0) / openTot * 100);
+    const conc = await p.locator('#rpConc .rp-conc').evaluateAll(rs => rs.map(r => r.dataset.party + ' ' + r.querySelector('b').textContent));
+    const topTxt = (await p.textContent('#rpTop3')).trim();
+    console.log('tabs: click', t1, s1, '| 받을 돈', manT(arTot), '| age', ageAmts.map(manT).join(' / '), '| top3', conc.join(', '), '| 상위 3곳', topTxt);
+    expect('탭 누르기: 받을 돈 탭과 패널만 보임', t1 === 'ar' && s1 === 'rpPanel-ar', { t1, s1 });
+    expect('받을 돈 나이 막대 합 = 받을 돈 합계(입금 전 매출) · 구간 = 거래일 기준 30일 이내 / 31~60일 / 연체', arTot === openTot && ageAmts.reduce((a, v) => a + v, 0) === openTot && ageAmts.join() === want3.join(), { arTot, openTot, ageAmts, want3 });
+    expect('거래처 쏠림 상위 3곳 · 비중', conc.join() === top3.map(x => x[0] + ' ' + Math.round(x[1] / openTot * 100) + '%').join() && topTxt === topPct + '%', { conc, top3, topTxt, topPct });
+    expect('받을 돈 목록: 줄마다 계산서 상태 · 버튼 최대 1개', await p.locator('#inList li.tr-row').evaluateAll(ls => ls.length > 0 && ls.every(l => /계산서/.test(l.querySelector('.tr-st').textContent) && l.querySelectorAll('button[data-act]:not(.tr-open)').length <= 1)), await p.locator('#inList li.tr-row').count());
+    if (SHOT) { await top(); await shot('01d-report-ar'); }
+    await p.keyboard.press('ArrowRight'); await p.waitForTimeout(120);
+    const t2 = await selTab(), f2 = await p.evaluate(() => document.activeElement.id);
+    const apTxt = (await p.locator('#outList h3').allInnerTexts()).map(t => t.replace(/\s+/g, ' ')).join(' / ');
+    console.log('tabs: ArrowRight', t2, 'focus', f2, '| 줄 돈', (await p.textContent('#rpApTot')).trim(), '|', apTxt);
+    expect('오른쪽 화살표: 줄 돈 탭(포커스 이동) · 플로우페이 대상 / 직접 결제 묶음', t2 === 'ap' && f2 === 'rpTab-ap' && apTxt.includes('플로우페이 대상') && apTxt.includes('직접 결제'), { t2, f2, apTxt });
+    await p.reload(); await p.waitForTimeout(150); await closePrompt(); await go('report');
+    const t3 = await selTab();
+    await p.focus('#rpTab-ap'); await p.keyboard.press('Home'); await p.waitForTimeout(120);
+    const t4 = await selTab();
+    expect('다시 불러와도 마지막 탭(줄 돈) · Home → 요약', t3 === 'ap' && t4 === 'sum', { t3, t4 });
+    if (SHOT) { await p.evaluate(() => document.activeElement.blur()); await top(); await shot('01c-report-summary'); } }
+
+  // 1. 수집함: 담당자가 확인(줄을 눌러 상세 → 수정: 오렌지유통 계산서 후보의 입금 예정일, 세진화학 발주의 납품 예정일·요구사항) → 대표가 모두 승인 → 매입·매출에 등록
+  const ibAct = async (party, act) => { await p.locator('#ibList .ib-row', { hasText: party }).locator('.ib-open').click(); await p.waitForTimeout(150); await p.click(`#dlgBody [data-act="${act}"]`); await p.waitForTimeout(150); };
   await p.click('#staffBtn'); await p.waitForTimeout(150);
   console.log('staff:', await p.textContent('#roleName'), '| prompt', await dlgOpen() ? await p.textContent('#dlgTitle') : '(없음)');
   await closePrompt(); await go('inbox');
   console.log('inbox staff:', await p.textContent('#ibHead'), '| rows', (await p.locator('#ibList .ib-row').evaluateAll(rs => rs.map(r => r.querySelector('b').textContent + ' ' + [...r.querySelectorAll('.flags .tag')].map(t => t.textContent).join(','))).catch(() => [])).join(' / '));
-  await p.locator('#ibList .ib-row', { hasText: '오렌지유통' }).locator('[data-act="ibEdit"]').click(); await p.waitForTimeout(150);
-  const due40 = await p.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 40); return d.toISOString().slice(0, 10); });
+  await ibAct('오렌지유통', 'ibEdit');
+  const due40 = isoAt(40);
   await p.fill('#ibe_due', due40); await p.click('#dlgFoot [data-act="ibSave"]'); await p.waitForTimeout(150);
+  await ibAct('세진화학', 'ibEdit');
+  await p.fill('#ibe_deliveryDue', isoAt(14)); await p.fill('#ibe_note', '오전 납품 · 드럼 포장'); await p.click('#dlgFoot [data-act="ibSave"]'); await p.waitForTimeout(150);
   await p.click('#ibBar [data-act="ibCheckAll"]'); await p.waitForTimeout(150);
   await go('orders');
   console.log('staff checked:', (await st()).inbox.map(c => c.party + ' ' + c.status).join(' / '), '| orders as staff:', await p.locator('#orderRows [data-act="ceoReq"], #orderRows [data-act="finance"]').first().textContent());
   await p.click('#staffBtn'); await p.waitForTimeout(150); await closePrompt(); await go('inbox');
   await top(); await shot('02-inbox-approve');
   console.log('inbox ceo:', await p.textContent('#ibHead'), '|', await p.textContent('#ibBar [data-act="ibApproveAll"]'), '| checked tags', await p.locator('#ibList .tag.ok', { hasText: '담당자 확인 완료' }).count());
+  const rowB = await p.locator('#ibList .ib-row').evaluateAll(ls => ls.map(l => [...l.querySelectorAll('button')].filter(b => !b.classList.contains('ib-open')).map(b => b.textContent)));
+  expect('승인함 줄마다 버튼 하나 "승인" (수정·반려는 줄을 눌러 상세 시트)', rowB.length === 2 && rowB.every(b => b.length === 1 && b[0] === '승인') && (await p.locator('#ibList [data-act="ibEdit"], #ibList [data-act="ibReject"]').count()) === 0, rowB);
   const nP = (await st()).purchases.length, nS = (await st()).sales.length;
   await p.click('#ibBar [data-act="ibApproveAll"]'); await p.waitForTimeout(150);
   let s = await st();
   console.log('approved:', s.inbox.map(c => c.party + ' ' + c.status).join(' / '), '| purchases +' + (s.purchases.length - nP), '| sales +' + (s.sales.length - nS), '|', await p.textContent('#ibHead'));
+  { const oc = s.inbox.find(c => c.doc === 'tax' && c.party === '오렌지유통'), os = s.sales.find(x => x.id === oc.refId), sc = s.inbox.find(c => c.party === '세진화학' && !c.doc), sp = s.purchases.find(x => x.id === sc.refId);
+    console.log('new deal from 계산서 후보:', os && [os.party, os.qty * os.price * 1.1, os.due, os.tax, os.taxOn, os.delivery].join(' '), '| 세진화학 발주 칸:', sp && [sp.deliveryDue, sp.terms, sp.note].join(' / '));
+    expect('새 거래 후보(오렌지유통 678만원 계산서) 승인 → 매출 거래 생성 · 계산서 발행(오늘) · 입금 예정일 = 수정한 날짜', oc.status === 'approved' && os && os.party === '오렌지유통' && Math.round(os.qty * os.price * 1.1) === oc.amt && os.status === 'open' && os.tax === 'issued' && os.taxOn === isoAt(0) && os.taxRef === oc.id && os.due === due40 && os.delivery === 'before', os);
+    expect('발주 칸이 거래에 저장: 납품 예정일 · 결제 조건(엑셀) · 요구사항', sp && sp.deliveryDue === isoAt(14) && sp.terms === '발주 후 30일' && sp.note === '오전 납품 · 드럼 포장', sp);
+    await go('orders');
+    await p.evaluate(id => [...document.querySelectorAll('#orderRows .tr-open')].find(b => b.dataset.id === id).click(), sp.id); await p.waitForTimeout(150);
+    const kvT = (await p.locator('#dlgBody .dt-kv').innerText()).replace(/\s+/g, ' ');
+    console.log('세진화학 상세:', kvT);
+    expect('거래 상세 시트에 납품 예정일 · 요구사항', kvT.includes('납품 예정일 ' + mdAt(14)) && kvT.includes('요구사항 오전 납품 · 드럼 포장'), kvT);
+    await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(100); }
 
-  // 2. 브라이트몰 연체 입금 확인 · 3. 한결푸드 기한 경과 세금계산서 발행 (+ 수집함에서 등록한 오렌지유통 매출 세금계산서)
+  // 1-1. 줄 버튼 규칙 (납품·계산서 상태별 버튼 하나): 매입 납품 전·계산서 전 → 플로우페이로 결제, 납품 완료/계산서 받음 → 직접 결제
+  //      매출 납품 완료·계산서 발행·입금 전 → 먼저 받기, 납품 완료·계산서 전 → 계산서 발행
+  const rowBtn = async (list, amt) => { const r = p.locator(`#${list} li.tr-row:visible`, { hasText: amt }).first(); return (await r.locator('.tr-st').innerText()).replace(/\s+/g, ' ') + ' [' + ((await r.locator('button.small').count()) ? await r.locator('button.small').getAttribute('data-act') + ' ' + await r.locator('button.small').textContent() : '없음') + ']'; };
+  await go('orders'); if (SHOT) { await top(); await shot('02a-orders-state'); }
+  { const r1 = await rowBtn('orderRows', '1,573만원'), r2 = await rowBtn('orderRows', '968만원');
+    console.log('row rule 매입:', r1, '/', r2);
+    expect('대성원료 1,573만원: 납품 전 · 계산서 전 → 플로우페이로 결제', r1 === '납품 전 · 계산서 전 [finance 플로우페이로 결제]', r1);
+    expect('대성원료 968만원: 납품 완료 · 계산서 받음 → 직접 결제', r2 === '납품 완료 · 계산서 받음 [pay 직접 결제]', r2); }
+  await go('sales'); if (SHOT) { await top(); await shot('02b-sales-state'); }
+  { const r3 = await rowBtn('saleRows', '660만원'), r4 = await rowBtn('saleRows', '1,241만원'), r5 = await rowBtn('saleRows', '303만원');
+    console.log('row rule 매출:', r3, '/', r4, '/', r5);
+    expect('그린마켓 660만원: 납품 완료 · 계산서 발행 → 먼저 받기', r3 === '납품 완료 · 계산서 발행 [factor 먼저 받기]', r3);
+    expect('그린마켓 1,241만원: 납품 완료 · 계산서 전 → 계산서 발행', r4 === '납품 완료 · 계산서 전 [tax 계산서 발행]', r4);
+    expect('브라이트몰 303만원(새 시나리오 매출): 먼저 받기', r5 === '납품 완료 · 계산서 발행 [factor 먼저 받기]', r5); }
+  // 유동화 목록: 계산서 발행 + 납품 완료 채권만 (수집함에서 등록한 납품 전 매출은 빠짐)
+  await go('factoring');
+  console.log('factoring list:', (await p.locator('#arRows li').allInnerTexts()).map(t => t.replace(/\s+/g, ' ')).join(' / '));
+  // 직접 결제: 대성원료 968만원 → 결제 완료(오늘) · 자금 예측에서 빠짐 (점검 뒤 원래 기록으로 되돌림)
+  { const snap0 = await p.evaluate(() => localStorage.getItem('flowpoint-test-v6'));
+    const out968 = async () => { await go('report'); return (await p.locator('#outList li').allInnerTexts()).map(t => t.replace(/\s+/g, ' ')).filter(t => t.includes('대성원료') && t.includes('968만원')).length; };
+    const o0 = await out968(), c0 = (await st()).cash;
+    await go('orders'); await p.locator('#orderRows li.tr-row:visible', { hasText: '968만원' }).locator('[data-act="pay"]').click(); await p.waitForTimeout(150);
+    const x = (await st()).purchases.find(y => y.qty === 400 && y.party === '대성원료'), o1 = await out968();
+    console.log('direct pay:', x.status, x.paidOn, '| 나갈 돈(14일) 대성원료 968만원', o0, '→', o1, '| cash', (await st()).cash - c0, '| toast', await p.textContent('#toast'));
+    expect('직접 결제: 지급 완료(오늘) · 자금 예측에서 빠짐', x.status === 'paid' && x.paidOn === isoAt(0) && o0 === 1 && o1 === 0, { status: x.status, paidOn: x.paidOn, o0, o1 });
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt(); }
+
+  // 2. 브라이트몰 연체 입금 확인 · 3. 수집함에서 등록한 오렌지유통 매출(계산서 발행) 납품 완료 → 먼저 받기 (한결푸드 계산서 기한 지남 352만원은 계산서 자동 연결로 이미 발행)
   await go('sales'); await p.locator('#saleRows li', { hasText: '연체' }).first().evaluate(e => e.scrollIntoView({ block: 'center' })); await shot('03-sales-overdue');
   // 목록 한 줄에 버튼 하나 · 줄을 누르면 상세 시트(나머지 동작)
   const rowBtns = await p.locator('#saleRows li.tr-row:visible').evaluateAll(ls => ls.map(l => l.querySelectorAll('button[data-act]:not(.tr-open)').length));
@@ -125,12 +358,14 @@ const SHOT = process.argv[3];
   await shot('03a-sales-detail');
   await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(100);
   await clickRow('saleRows', '브라이트몰', 'paid');
-  const before = (await st()).sales.filter(x => x.party === '한결푸드' && x.tax !== 'issued').length;
-  await p.locator('#saleRows li', { hasText: '계산서 기한 경과' }).first().locator('[data-act="tax"]').click(); await p.waitForTimeout(120);
-  console.log('한결 미발행', before, '→', (await st()).sales.filter(x => x.party === '한결푸드' && x.tax !== 'issued').length);
-  // 수집함에서 방금 등록한 오렌지유통 매출도 세금계산서 발행 (뒤에서 유동화 대상)
-  await p.locator('#saleRows li', { hasText: '오렌지유통' }).locator('[data-act="tax"]').first().evaluate(e => e.click()); await p.waitForTimeout(120);
-  console.log('오렌지유통(수집함) tax:', (await st()).sales.filter(x => x.party === '오렌지유통').map(x => x.due.slice(5) + ' ' + x.tax).join(' / '));
+  // 한결푸드 기한 지난 352만원은 수집된 세금계산서로 이미 발행(자동 연결) → 남은 미발행(440만원·330만원)은 뒤 플로우페이 묶음에 씀
+  console.log('한결 미발행', (await st()).sales.filter(x => x.party === '한결푸드' && x.tax !== 'issued').map(x => manT0(x)).join(', '), '(352만원은 계산서 자동 연결로 발행)');
+  // 수집함에서 방금 등록한 오렌지유통 매출(계산서로 들어와 발행됨 · 납품 전이라 줄 버튼 없음): 상세 시트에서 납품 완료 → 먼저 받기 (뒤에서 유동화 대상)
+  const o0 = await rowBtn('saleRows', '678만원');
+  await clickRow('saleRows', '678만원', 'dlvDone');
+  const o1 = await rowBtn('saleRows', '678만원');
+  console.log('오렌지유통(수집함) row:', o0, '→ 납품 완료', o1, '| tax:', (await st()).sales.filter(x => x.party === '오렌지유통').map(x => x.due.slice(5) + ' ' + x.tax).join(' / '));
+  expect('계산서로 등록한 오렌지유통 678만원: 납품 전 · 계산서 발행 [없음] → 납품 완료 후 먼저 받기', o0 === '납품 전 · 계산서 발행 [없음]' && o1 === '납품 완료 · 계산서 발행 [factor 먼저 받기]', { o0, o1 });
   console.log('LOG after 1-3:\n  ' + (await log()).join('\n  '));
   await go('score'); await p.click('#scSeg [data-sc="me"]'); await p.waitForTimeout(120); await into('#scLog', 112); await shot('04-score-log');
 
@@ -144,7 +379,7 @@ const SHOT = process.argv[3];
   console.log('step2 그린마켓만:', await step2());
   await p.locator('#dlg .docrow', { hasText: '330만원' }).locator('input').check(); await p.waitForTimeout(150);
   console.log('step2 +한결푸드 330만원:', await step2());
-  // 330만원 대신 440만원(한결푸드 200개, 세금계산서 기한 경과) 매출을 묶으면 충분 → 다음 단계로
+  // 330만원 대신 440만원(한결푸드 200개, 계산서 기한 지남) 매출을 묶으면 충분 → 다음 단계로
   await p.locator('#dlg .docrow', { hasText: '330만원' }).locator('input').uncheck(); await p.waitForTimeout(150);
   await p.locator('#dlg .docrow', { hasText: '440만원' }).locator('input').check(); await p.waitForTimeout(150);
   console.log('step2 그린마켓+한결푸드 440만원:', await step2(), '|', await p.textContent('#fpCover + .sum'));
@@ -163,6 +398,7 @@ const SHOT = process.argv[3];
   await shot('06-apply-price');
   await p.click('dialog [data-act="submitApply"]'); await p.waitForTimeout(150);
   s = await st(); console.log('app status after submit:', s.apps.map(a => a.status));
+  expect('플로우페이 신청 → 거래 상대 확인 대기 (미발행 매출 연결)', s.apps.length === 1 && s.apps[0].status === 'confirm', s.apps.map(a => a.status));
   console.log('app price:', s.apps.map(a => `tier ${a.tier} rate ${a.rate} sale ${a.saleSupply}+${a.saleVat}=${a.saleTotal} pay ${a.payDate} mileage ${a.mileage} repay ${a.repayTotal} grace ${a.graceDays}`).join(''));
   console.log('app alloc:', s.apps[0].alloc.map(r => `${s.sales.find(x => x.id === r.saleId).party} ${r.due.slice(5)} ${r.saleTotal}→${r.forward}`).join(' / '), '| links', s.apps[0].links.length);
   { const a = s.apps[0];
@@ -173,6 +409,7 @@ const SHOT = process.argv[3];
   console.log('confirm buttons:', (await p.locator('#apps [data-act="cfm"]').allTextContents()).join(' / '));
   while (await p.locator('#apps [data-act="cfm"]').count()) { await p.locator('#apps [data-act="cfm"]').first().click(); await p.waitForTimeout(120); }
   s = await st(); console.log('after confirm:', s.apps.map(a => a.status));
+  expect('거래 상대 확인 → 심사 대기', s.apps[0].status === 'review', s.apps[0].status);
 
   // 6. 심사역 전환 → 심사 대기(AI 검토 보고서 예시) → 사유 고르고 승인
   await role();
@@ -186,17 +423,20 @@ const SHOT = process.argv[3];
   console.log('ai summary:', await ai.locator('.ai-sum').textContent());
   await into('#rvQueue .ai-rep', 140); await shot('08-review-ai');
   await p.click('#rvQueue [data-act="rvApprove"]'); await p.waitForTimeout(120);
-  console.log('approve w/o reason status:', (await st()).apps.map(a => a.status));
+  const noReason = (await st()).apps[0].status; console.log('approve w/o reason status:', (await st()).apps.map(a => a.status));
   await p.locator('#rvQueue .reasons label', { hasText: '입금 이력 양호' }).locator('input').check();
   await p.locator('#rvQueue .reasons label', { hasText: '세금계산서 미발행' }).locator('input').check();
   await p.click('#rvQueue [data-act="rvApprove"]'); await p.waitForTimeout(120);
   console.log('after approve:', (await st()).apps.map(a => a.status));
+  expect('사유 없이 승인 안 됨 · 사유 고르면 서명 대기', noReason === 'review' && (await st()).apps[0].status === 'sign', { noReason, now: (await st()).apps[0].status });
 
   // 7. 고객(대표) 전자서명 → 집행, 거래 문서 7종 생성 (① 고객 발주서 완료 · ② 매입처 발주서 보냄)
   await role();
   await p.click('[data-act="sign"]'); await p.waitForTimeout(120);
   s = await st(); console.log('after sign:', s.apps.map(a => a.status), '| 대성 650:', (x => `${x.status} repay ${x.repayAmount} on ${x.repayDate}`)(s.purchases.find(x => x.qty === 650)), '| 그린마켓 470:', s.sales.find(x => x.qty === 470).status);
   console.log('deal docs after sign:', await docSt());
+  expect('전자서명 → 집행 · 매입 플로우페이 결제 · 상환일 = 마지막 묶은 매출 입금일 · 문서 1 완료 · 2 보냄', s.apps[0].status === 'done' && (x => x.status === 'financed' && x.repayAmount === s.apps[0].repayTotal && x.repayDate === s.apps[0].payDate)(s.purchases.find(x => x.qty === 650)) && (await docSt()) === 'done sent wait wait wait wait wait',
+    { status: s.apps[0].status, docs: await docSt() });
   const snap = await p.evaluate(() => localStorage.getItem('flowpoint-test-v6'));  // 부록(48시간 재알림·D+1 미입금) 점검용
   await go('deals'); await top();
   console.log('deals list:', await p.locator('#dlList .dl-row').count(), '| progress:', (await p.locator('#dlList .dl-prog li').allTextContents()).join(' / '));
@@ -213,11 +453,13 @@ const SHOT = process.argv[3];
   await p.click('#dlDetail [data-act="dlPay"]'); await p.waitForTimeout(120);
   await p.click('#dlDetail [data-act="dlIssue"]'); await p.waitForTimeout(120);
   console.log('after pay + issue:', await docSt());
+  expect('매입처 링크 서명·세금계산서 → 대금 지급 · 고객사 세금계산서 발행 (문서 1~4 완료)', (await docSt()) === 'done done done done sent sent wait', await docSt());
 
   // 10. 고객(대표): 납품 확인 (거래명세서 서명 · 입고 사진 · 입금일 확인)
   await role(); await go('deals');
   await deliver(true);
   s = await st(); console.log('after delivery:', await docSt(), '| photo saved', s.deals[0].photo.length <= 150 * 1024);
+  expect('납품 확인 → 문서 1~6 완료 · 7(넘김) 진행 · 사진 150KB 이하', (await docSt()) === 'done done done done done done due' && s.deals[0].photo.length <= 150 * 1024, await docSt());
 
   // 11. 묶은 매출 입금 확인 → "오늘 276에 넘길 금액" 시트. 첫 번째(한결푸드 440만원)는 나중에 → 줄의 "넘기기"로 넘김
   const fwdSheet = async () => (await p.textContent('#dlgTitle')) + ' ' + (await p.textContent('#fwdAmt')) + ' [' + (await p.locator('#dlgFoot button').allTextContents()).join(', ') + ' | ' + (await p.textContent('#dlgLeft button')) + ']';
@@ -263,6 +505,8 @@ const SHOT = process.argv[3];
   console.log('reminders before:', await rem());
   await p.click('footer [data-shift="30"]'); await p.waitForTimeout(150);
   console.log('+30일:', await day(), '| toast:', await p.textContent('#toast'), '| reminders:', await rem(), '|', await fw());
+  { const r = await rem(), payDay = (await st()).apps[0].payDate.slice(5);
+    expect('+30일: 그린마켓 입금일 기준 D-7 · 당일 · D+1 안내 보냄, 넘긴 금액은 그대로', (await day()).includes(mdAt(30) + ' (+30일)') && r.includes('D-day@' + payDay) && /D-7@/.test(r) && /D\+1@/.test(r) && (await fw()) === 'fwd 4400000 = 4400000 / 15965090 · outcome -', { r, payDay }); }
   await closePrompt(); await go('calendar'); await top();
   console.log('calendar:', await p.textContent('#calHead'), '| marks', await p.locator('#calBox .mk-fp').count(), '| timeline:', await tl());
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#calUp [data-act="icsGet"]')]);
@@ -310,8 +554,10 @@ const SHOT = process.argv[3];
   console.log('thanks preview:', await p.textContent('#dlgTitle'), '|', await p.textContent('dialog .mail-h .subj'), '|', thPrev);
   { const a = s.apps[0], pu = s.purchases.find(x => x.qty === 650);
     expect('완납: 넘긴 합계 15,965,090 = 넘길 금액, outcome repaid(자동), 매입 상환 완료, 문서 7종 완료', a.outcome === 'repaid' && a.auto && (a.fwd || []).reduce((t, f) => t + f.amt, 0) === 15965090 && pu.status === 'repaid' && s.deals[0].status === 'done' && s.deals[0].docs.every(x => x.status === 'done'), { outcome: a.outcome, fwd: a.fwd, pu: pu.status, deal: s.deals[0].status });
-    expect('완납 점수 654→679', s.scoreLog.some(l => l.target === '우리 회사' && l.before === 654 && l.after === 679 && l.why.startsWith('플로우페이 상환 완료')), s.scoreLog.slice(-3));
-    expect('감사 메일: 654→679 · 한도 4,312만→5,012만', th && th.scoreBefore === 654 && th.scoreAfter === 679 && th.limBefore === 43120000 && th.limAfter === 50120000 && thPrev.includes('654점 → 679점') && thPrev.includes('4,312만원 → 5,012만원'), thPrev); }
+    // 점수·한도는 실행 날짜에 따라 절대값이 달라지므로 변화량으로 본다 (완납 +25점 → 한도 +1,000만 × 0.7(기한 지난 계산서) = +700만)
+    const manT = v => Math.round(v / 10000).toLocaleString('ko-KR') + '만원';
+    expect('완납 점수 +25', s.scoreLog.some(l => l.target === '우리 회사' && l.after - l.before === 25 && l.why.startsWith('플로우페이 상환 완료')), s.scoreLog.slice(-3));
+    expect('감사 메일: 점수 +25 · 한도 +700만', th && th.scoreAfter - th.scoreBefore === 25 && th.limAfter - th.limBefore === 7000000 && thPrev.includes(th.scoreBefore + '점 → ' + th.scoreAfter + '점') && thPrev.includes(manT(th.limBefore) + ' → ' + manT(th.limAfter)), thPrev); }
   await shot('13-thanks-mail');
   await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(100);
   await p.click('footer [data-shift="7"]'); await p.waitForTimeout(150);
@@ -321,6 +567,9 @@ const SHOT = process.argv[3];
   await role();
   await go('sales');
   await clickRow('saleRows', '오렌지유통', 'factor');
+  { const fT = await p.textContent('#dlgTitle'), fSum = (await p.locator('#dlgBody .sum').first().innerText()).replace(/\s+/g, ' ');
+    console.log('먼저 받기 → ', fT, '|', fSum);
+    expect('매출 줄 먼저 받기 → 유동화 신청 · 그 채권(오렌지유통 678만원)이 미리 선택', fT === '유동화 신청' && fSum.includes('오렌지유통') && fSum.includes('678만원'), fSum); }
   await p.check('#arc1'); await p.check('#arc2'); await p.click('#arNext'); await p.waitForTimeout(150);
   await next(); // ② 채권 정보 → ③ 서류 확인 (날짜를 옮기는 동안 유효기간이 지난 서류는 다시 올림)
   const arNeed = await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').evaluateAll(bs => bs.map(x => x.closest('.docrow').firstChild.firstChild.textContent.trim()));
@@ -339,6 +588,8 @@ const SHOT = process.argv[3];
   await into('#appsAr'); await shot('14-notice-wait');
   await p.click('#appsAr [data-act="notice"]'); await p.waitForTimeout(120);
   console.log('ar after notice:', (await st()).apps[1].status, '| cash +', (await st()).cash - cashBefore);
+  { const a1 = (await st()).apps[1], got = (await st()).cash - cashBefore;
+    expect('유동화: 심사 승인 · 서명 · 채무자 통지 → 완료 · 채권액보다 적은 금액(비용 차감)이 먼저 들어옴', a1.type === 'ar' && a1.status === 'done' && got > 0 && got < 6776000, { status: a1.status, got }); }
   await role();
   await p.click('#rvAfter [data-act="rvOut"][data-r="late"]'); await p.waitForTimeout(120);
   console.log('LOG final:\n  ' + (await log()).join('\n  '));
@@ -406,8 +657,8 @@ const SHOT = process.argv[3];
   const scLate = (await st()).scoreLog.length;
   await p.click('footer [data-shift="1"]'); await p.waitForTimeout(150); await closePrompt();
   s = await st(); console.log('[부록] +13일 (D+8):', await late(), '| toast', await p.textContent('#toast'), '| 대성 650', s.purchases.find(x => x.qty === 650).status + ' late ' + s.purchases.find(x => x.qty === 650).repayLate, '| score', s.scoreLog.slice(scLate).map(l => l.target + ' ' + l.before + '→' + l.after + ' (' + l.why + ')').join(' / '));
-  expect('D+8 자동 연체: outcome late · 매입 연체일 기록 · 점수 601→481', s.apps[0].outcome === 'late' && s.apps[0].outDate === isoAt(13) && s.purchases.find(x => x.qty === 650).repayLate === isoAt(13) &&
-    s.scoreLog.slice(scLate).some(l => l.target === '우리 회사' && l.before === 601 && l.after === 481 && l.why.startsWith('플로우페이 연체')), s.scoreLog.slice(scLate));
+  expect('D+8 자동 연체: outcome late · 매입 연체일 기록 · 점수 −120', s.apps[0].outcome === 'late' && s.apps[0].outDate === isoAt(13) && s.purchases.find(x => x.qty === 650).repayLate === isoAt(13) &&
+    s.scoreLog.slice(scLate).some(l => l.target === '우리 회사' && l.before - l.after === 120 && l.why.startsWith('플로우페이 연체')), s.scoreLog.slice(scLate));
   await go('sales'); console.log('[부록] late row:', (await p.locator('#saleRows li.tr-row', { hasText: '상환 매출' }).evaluateAll(ls => ls.map(l => l.innerText.replace(/\s+/g, ' ')))).join(' / '));
   await go('flowpay'); console.log('[부록] service progress late:', (await p.locator('#apps .fw').innerText()).replace(/\s+/g, ' '));
   await role(); console.log('[부록] reviewer:', await rvRow(), '| rvOut', await p.locator('#rvAfter li', { hasText: '대성원료' }).locator('[data-act="rvOut"]').count()); await role();

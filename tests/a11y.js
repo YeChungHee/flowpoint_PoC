@@ -3,14 +3,16 @@
 const { chromium } = require('playwright');
 const FILE = 'file://' + process.argv[2];
 const KEY = 'flowpoint-test-v6';
-// 'prompt'(접속 시 승인 창)·'ibedit'(수집함 수정 시트)·'docprev'(거래 문서 미리보기)·'delivery'(납품 확인 시트)는 해시가 아니라 시트를 연 상태
+// 'prompt'(접속 시 승인 창)·'ibdetail'(수집함 승인 줄을 눌러 연 상세 시트: 발주 칸 확인 필요 · 승인·수정·반려)·'ibedit'(상세 → 수정 시트, 새 거래 후보 계산서)·'docprev'(거래 문서 미리보기)·'delivery'(납품 확인 시트)는 해시가 아니라 시트를 연 상태
 // 'notif'(알림함 시트)·'thanks'(감사 메일 미리보기, 결제 캘린더의 결제 완료 카드에서)도 시트를 연 상태. 'calendar'는 집행 후 결제 1건이 있는 결제 캘린더
 // 'saledetail'은 #sales에서 연체 줄을 눌러 연 거래 상세 시트, 'newtrade'는 "+ 새 거래" 입력 시트
 // 'fwdsheet'는 집행 후 묶은 매출(한결푸드) 입금 확인 → "오늘 276에 넘길 금액" 시트. #sales는 입금 확인 후 "나중에"(줄에 넘기기), #flowpay는 1건 넘긴 진행률 상태
 // 'actsheet'는 심사 화면(포트폴리오 · 이슈 피드 · AI 검토 보고서)에서 이슈 하나의 '조치 기록' 시트를 연 상태
+// 'shortsheet'는 #home 오늘 할 일의 "부족 해결"로 연 부족 해결 비교 시트(플로우페이·먼저 받기 후보, 추천 1개)
+// 'report-ar'·'report-ap'는 #report(자금일보)에서 받을 돈 · 줄 돈 탭을 고른 상태 (해시는 #report 그대로)
 // 'dealdetail'은 #deals에서 거래 하나를 연 상태(좁은 화면은 상세만), 'link'는 매입처 외부용 화면(#link/<token>, 1단계 발주서 열람)
-const HASHES = ['home', 'inbox', 'report', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet'];
-const SHEETS = ['prompt', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet'];
+const HASHES = ['home', 'inbox', 'report', 'report-ar', 'report-ap', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet'];
+const SHEETS = ['prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet'];
 const SIZES = { 1280: 800, 820: 1180, 390: 844 };
 
 // 알고 있는 예외 (실패로 세지 않고 이유와 함께 따로 보여 준다). key는 "점검|선택자" 앞부분과 비교
@@ -148,6 +150,14 @@ const AUDIT = () => {
     const prev = host.previousElementSibling;
     if (!prev || !visible(prev) || !/\d/.test(prev.textContent)) charts.push({ key: id + ' sum', msg: '차트 바로 위에 수치가 든 한 줄 요약이 없음' });
   }
+  // HTML로 그린 막대 차트(자금일보 받을 돈 나이 · 거래처 쏠림): role=img + 수치가 든 설명
+  for (const el of document.querySelectorAll('#rpAge, #rpConc')){
+    if (!visible(el)) continue;
+    nChart++;
+    const lb = el.getAttribute('aria-label') || '';
+    if (el.getAttribute('role') !== 'img') charts.push({ key: sel(el) + ' role', msg: 'role=img 없음' });
+    if (!/\d/.test(lb)) charts.push({ key: sel(el) + ' label', msg: '설명에 수치 요약이 없음: "' + lb + '"' });
+  }
   return { contrast, target, overflow, charts, n: { contrast: nText, target: nTarget, charts: nChart } };
 };
 
@@ -229,9 +239,21 @@ async function openHash(p, h){
     await p.evaluate(() => document.querySelector('#dlgBody [data-act="paid"]').click()); await p.waitForTimeout(150);
     return;
   }
-  if (h === 'ibedit'){
+  if (h === 'shortsheet'){
+    await p.evaluate(() => location.hash = 'home'); await p.waitForTimeout(150);
+    await p.evaluate(() => document.querySelector('#sigBox [data-act="shortSheet"]').click()); await p.waitForTimeout(150);
+    return;
+  }
+  if (h === 'report-ar' || h === 'report-ap'){
+    await p.evaluate(() => location.hash = 'report'); await p.waitForTimeout(150);
+    await p.evaluate(x => document.getElementById('rpTab-' + x).click(), h.slice(7)); await p.waitForTimeout(150);
+    return;
+  }
+  if (h === 'ibdetail' || h === 'ibedit'){
     await p.evaluate(() => location.hash = 'inbox'); await p.waitForTimeout(120);
-    await p.locator('#ibList [data-act="ibEdit"]').last().click(); await p.waitForTimeout(150);
+    // 상세: 마지막 줄(세진화학 발주 · 납품 예정일·요구사항 확인 필요) / 수정: 첫 줄(오렌지유통 계산서 후보)의 상세 → 수정
+    await p.evaluate(x => { const os = document.querySelectorAll('#ibList .ib-open'); os[x === 'ibdetail' ? os.length - 1 : 0].click(); }, h); await p.waitForTimeout(150);
+    if (h === 'ibedit'){ await p.evaluate(() => document.querySelector('#dlgBody [data-act="ibEdit"]').click()); await p.waitForTimeout(150); }
     return;
   }
   if (h === 'link'){
@@ -349,7 +371,7 @@ async function auditPass(b, opt, reviewState, label){
     await openHash(p, h);
     const ctxName = label + ' #' + h;
     const now = await p.evaluate(() => location.hash);
-    if (h !== 'company' && h !== 'link' && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
+    if (h !== 'company' && h !== 'link' && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h.replace(/-a[rp]$/, '')) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
     if (SHEETS.includes(h) && !(await p.evaluate(() => document.getElementById('dlg').open))) fail('route', h, '시트가 열리지 않음', ctxName);
     const r = await p.evaluate(AUDIT);
     count('contrast', r.n.contrast); count('target', r.n.target); count('overflow', 1); count('charts', r.n.charts);
@@ -469,6 +491,15 @@ async function keyboardPass(b, reviewState){
     await p.keyboard.press('Escape'); await p.waitForTimeout(150);
     const nBack = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.id === 'tbAct');
     if (!nOpen || !nBack) fail('keys', 'newtrade-esc', '새 거래 시트가 Enter로 열리고(첫 칸 포커스) Esc로 닫힌 뒤 버튼으로 포커스가 돌아오지 않음', C);
+    // 수집함 승인 줄: Enter → 상세 시트(포커스는 시트 안), Esc → 닫히고 그 줄로 포커스가 돌아옴
+    await p.evaluate(() => location.hash = 'inbox'); await p.waitForTimeout(150);
+    count('keys', 2);
+    const ib = p.locator('#ibList .ib-open').last(), iid = await ib.getAttribute('data-id');
+    await ib.focus(); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const iOpen = await p.evaluate(() => document.getElementById('dlg').open && !!document.activeElement.closest('dialog') && !!document.querySelector('#dlgBody [data-act="ibApprove"]'));
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const iBack = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.dataset.act === 'ibView' ? document.activeElement.dataset.id : null);
+    if (!iOpen || iBack !== iid) fail('keys', 'ibdetail-esc', '수집함 상세 시트가 Enter로 열리고 Esc로 닫힌 뒤 그 줄로 포커스가 돌아오지 않음', C);
     await ctx.close();
   }
   // (2-1) 넘길 금액 시트: 열리면 "276에 넘기기"에 포커스, Esc(나중에)로 닫히면 그 매출 줄로 포커스가 돌아옴. "완료 N건" 펼침은 Enter로 열고 닫음
@@ -482,6 +513,43 @@ async function keyboardPass(b, reviewState){
     await p.focus('#saleRows .tr-fold'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
     const fo = await p.evaluate(() => [document.activeElement.classList.contains('tr-fold'), document.activeElement.getAttribute('aria-expanded'), document.querySelectorAll('#saleRows li.tr-done[hidden]').length]);
     if (!fo[0] || fo[1] !== 'true' || fo[2] !== 0) fail('keys', 'fold-enter', '"완료 N건" 펼침이 Enter로 열리지 않거나 포커스를 잃음 (' + fo + ')', C);
+    await ctx.close();
+  }
+  // (2-2) 부족 해결 시트: 홈 오늘 할 일의 "부족 해결"에서 Enter → 시트(추천 버튼에 포커스), Esc → 닫히고 연 버튼으로 포커스.
+  //       자금일보 알림의 "부족 해결"도 같은 방식. 추천 버튼 Enter → 신청 시트(단계 제목에 포커스), Esc → 처음 연 버튼으로
+  {
+    const { ctx, p } = await newPage(b, { w: 1280, h: 800 });
+    count('keys', 3);
+    for (const [h, sel] of [['home', '#sigBox [data-act="shortSheet"]'], ['report', '#sfCallout [data-act="shortSheet"]']]){
+      await p.evaluate(x => location.hash = x, h); await p.waitForTimeout(150);
+      await p.focus(sel); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+      const foc = await p.evaluate(() => document.getElementById('dlg').open && document.getElementById('dlgTitle').textContent === '부족 해결' && document.activeElement.dataset.act);
+      await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+      const back = await p.evaluate(s => !document.getElementById('dlg').open && document.activeElement === document.querySelector(s), sel);
+      if (foc !== 'shortGo' || !back) fail('keys', 'short-esc-' + h, '부족 해결 시트 포커스(' + foc + ')·Esc 후 연 버튼 포커스(' + back + ')가 맞지 않음', C + ' #' + h);
+    }
+    await p.focus('#sfCallout [data-act="shortSheet"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const ap = await p.evaluate(() => document.getElementById('dlg').open && !!document.querySelector('#dlg .stepbar') && document.activeElement.classList.contains('step-t'));
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const back2 = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.dataset.act);
+    if (!ap || back2 !== 'shortSheet') fail('keys', 'short-go', '추천 버튼 Enter로 신청 시트가 열리고(단계 제목 포커스) Esc 후 연 버튼으로 돌아오지 않음 (' + ap + ', ' + back2 + ')', C);
+    await ctx.close();
+  }
+  // (2-3) 자금일보 탭: 고른 탭만 Tab 순서(tabindex 0) · 오른쪽/왼쪽 화살표 · End로 탭과 패널이 바뀌고 포커스가 따라감
+  {
+    const { ctx, p } = await newPage(b, { w: 1280, h: 800 });
+    await p.evaluate(() => location.hash = 'report'); await p.waitForTimeout(150);
+    count('keys', 4);
+    const now = () => p.evaluate(() => { const t = document.activeElement; const sel = [...document.querySelectorAll('#reportBody [role="tab"]')]; return [t.dataset.tab, sel.filter(x => x.getAttribute('aria-selected') === 'true').map(x => x.dataset.tab).join(), sel.filter(x => x.tabIndex === 0).length, [...document.querySelectorAll('#reportBody [role="tabpanel"]')].filter(x => !x.hidden).map(x => x.id).join()].join('|'); });
+    const roles = await p.evaluate(() => !!document.querySelector('#reportBody [role="tablist"]') && [...document.querySelectorAll('#reportBody [role="tab"]')].every(t => document.getElementById(t.getAttribute('aria-controls')).getAttribute('aria-labelledby') === t.id));
+    if (!roles) fail('keys', 'rp-roles', '자금일보 탭에 tablist/tab/tabpanel 연결(aria-controls·aria-labelledby)이 없음', C + ' #report');
+    await p.focus('#rpTab-sum');
+    for (const [k, want] of [['ArrowRight', 'ar|ar|1|rpPanel-ar'], ['End', 'ap|ap|1|rpPanel-ap'], ['ArrowRight', 'sum|sum|1|rpPanel-sum']]){
+      await p.keyboard.press(k); await p.waitForTimeout(150);
+      const got = await now();
+      if (got !== want) fail('keys', 'rp-tab-' + k + '-' + want.split('|')[0], '자금일보 탭에서 ' + k + ' 후 ' + got + ' (기대 ' + want + ')', C + ' #report');
+    }
     await ctx.close();
   }
   // (3) 휴대폰: 거래 세그먼트 화살표, 더보기 시트 Esc
