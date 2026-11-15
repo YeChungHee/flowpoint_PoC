@@ -252,6 +252,8 @@ input{font:inherit;font-size:var(--fs-body);color:var(--ink);background:var(--fi
 input:focus{outline:none;border-color:var(--brand);background:var(--surface)}
 input[type="checkbox"],input[type="radio"]{accent-color:var(--brand);width:18px;height:18px}
 .tbl{overflow-x:auto;margin-top:18px}
+/* 소개 페이지: 넓은 화면에서만 줄 바꿈(휴대폰은 자연스럽게 흐르게) */
+@media (max-width:600px){.br-wide{display:none}}
 /* 판단 기록: 날짜·결과·점수·이후 결과와 머리글은 한 줄로(상태 배지가 글자 단위로 꺾이지 않게) */
 #rvLog th,#rvLog td:nth-child(1),#rvLog td:nth-child(3),#rvLog td:nth-child(5),#rvLog td:nth-child(6),#rvLog .tag{white-space:nowrap}
 table{border-collapse:collapse;width:100%;min-width:680px}
@@ -1289,7 +1291,7 @@ footer .foot-note{flex:1 1 16em}
     <div class="it-in it-hero">
       <p class="it-eye">플로우포인트</p>
       <h1>매입과 매출이 <br>자금이 되는 곳.</h1>
-      <p class="it-sub">발주서와 계산서를 올리면 거래가 정리되고, 쌓인 거래는 점수가 되고, 점수는 결제와 유동화로 이어집니다.</p>
+      <p class="it-sub">발주서와 계산서를 올리면 거래가 정리되고, 쌓인 거래는 점수가 되고,<br class="br-wide"> 점수는 결제와 유동화로 이어집니다.</p>
       <div class="it-acts">
         <button class="primary" type="button" data-act="itStart">무료로 시작하기</button>
         <button class="plain" type="button" data-act="itConsult">도입 상담 신청<span aria-hidden="true"> ›</span></button>
@@ -1315,7 +1317,7 @@ footer .foot-note{flex:1 1 16em}
       <section class="it-in it-sec" aria-labelledby="itTools">
         <p class="it-eye" style="color:var(--text2)">업무 도구</p>
         <h2 class="it-h2" id="itTools" tabindex="-1">엑셀 대신, 수집함.</h2>
-        <p class="it-lead">발주서·세금계산서를 끌어다 놓으면 거래로 정리됩니다. 매입과 매출, 결제일까지 한 번에.</p>
+        <p class="it-lead">발주서·세금계산서를 끌어다 놓으면 거래로 정리됩니다.<br class="br-wide"> 매입과 매출, 결제일까지 한 번에.</p>
         <div class="it-tools">
           <div class="it-card tall"><div><h3>수집함</h3><p>파일을 올리면 승인함에서 확인만 하면 됩니다.</p></div>
             <div class="it-drop"><span class="ic" data-ic="inbox"></span>발주 파일을 끌어다 놓기</div></div>
