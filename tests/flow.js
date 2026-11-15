@@ -235,6 +235,106 @@ const SHOT = process.argv[3];
     await p.keyboard.press('Escape'); await p.waitForTimeout(120);
     await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt();
 
+    // 0-1b. 부족 해결 4단계(v7): 이유 폭포 합계 = 예측 최저 · 건수 · 영향(독립 시뮬레이션: 지급 불가 매입 · 점수 −40×건수 · 한도 식) · 바꿀 수 있는 구간 · 보류 사유 필수 · 승인·보류 기록
+    //   날짜는 고정값이 아니라 관계(결제일 − 3일, 같은 날 합침, 최저일까지의 건수)로 확인
+    { await go('home'); await p.click('#sigBox [data-act="shortSheet"]'); await p.waitForTimeout(150);
+      const SB = await st(), minV = Math.min(...base), minD = base.indexOf(minV), manX = v => (v < 0 ? '−' : '') + manT(Math.abs(v));
+      // 독립 이벤트 목록 (시작 시나리오: 결제 예정 매입 · 입금 전 매출만): [날, 금액, 거래]
+      const evs = []; SB.purchases.forEach(x => { if (x.status === 'ordered') evs.push([Math.max(0, dOf(x.due)), -tot(x), x]); });
+      SB.sales.forEach(x => { if (x.status === 'open' && dOf(x.due) >= 0) evs.push([dOf(x.due), tot(x), x]); });
+      const upTo = evs.filter(e => e[0] <= minD).sort((x, y) => x[0] - y[0]), inY = upTo.filter(e => e[1] > 0).reduce((a, e) => a + e[1], 0), outZ = -upTo.filter(e => e[1] < 0).reduce((a, e) => a + e[1], 0);
+      const wf = await p.evaluate(() => ({ rows: [...document.querySelectorAll('#sfWf li')].map(l => ({ amt: +l.dataset.amt, n: +(l.dataset.n || 0), day: l.dataset.day == null ? null : +l.dataset.day, txt: l.innerText.replace(/\s+/g, ' ') })),
+        chk: Object.assign({}, document.getElementById('sfWfChk').dataset), chkTxt: document.getElementById('sfWfChk').innerText.replace(/\s+/g, ' '), n: +document.getElementById('sfWfN').textContent, eq: document.getElementById('sfWfEq').textContent }));
+      const mid = wf.rows.filter(r => r.day != null), wfSum = wf.rows[0].amt + mid.reduce((a, r) => a + r.amt, 0);
+      console.log('waterfall:', wf.rows.map(r => r.txt).join(' / '), '|', wf.chkTxt);
+      expect('이유 폭포: 오늘 잔고 + 건별 ± = 예측 최저 잔고(원 단위) · "합계 일치 ✓"', wf.rows[0].amt === SB.cash && wfSum === minV && +wf.chk.sum === minV && +wf.chk.want === minV && wf.chk.gap === '0' &&
+        wf.chkTxt.includes('합계 일치 ✓') && !wf.chkTxt.includes('차이') && wf.rows[wf.rows.length - 1].amt === minV, { wfSum, minV, chk: wf.chk });
+      expect('폭포 건수 = 최저일까지의 입출금 건수 (12줄 이하 · 모두 최저일 이전 · 같은 날 묶음 포함 합계 그대로)', wf.n === upTo.length && mid.reduce((a, r) => a + r.n, 0) === upTo.length && mid.length <= 12 && mid.every(r => r.day <= minD) &&
+        mid.every((r, i) => !i || r.day >= mid[i - 1].day), { n: wf.n, want: upTo.length, rows: mid.length });
+      const lbl = e => (d => (d.getMonth() + 1) + '/' + d.getDate())(dAt(e[0])) + ' ' + e[2].party + ' ' + (e[1] > 0 ? '+' : '−') + Math.round(Math.abs(e[1]) / 10000).toLocaleString('ko-KR') + '만';
+      expect('폭포 줄 = 날짜 · 거래처 · ±금액 (최저일까지 이벤트 순서대로)', mid.length !== upTo.length || mid.every((r, i) => r.txt === lbl(upTo[i])), { got: mid.map(r => r.txt), want: upTo.map(lbl) });
+      expect('글 대안: "오늘 X + 들어올 돈 Y − 나갈 돈 Z = 최저 W"', wf.eq === '오늘 ' + manT(SB.cash) + ' + 들어올 돈 ' + manT(inY) + ' − 나갈 돈 ' + manT(outZ) + ' = 최저 ' + manX(minV) && SB.cash + inY - outZ === minV, wf.eq);
+      // 영향: 결제 예정 매입을 결제일 순서로 그날 잔고(같은 날 들어올 돈 먼저)로 낸다고 보고 못 내는 매입 · 늦은 지급일
+      let bb = SB.cash; const unpaid = [], wait = [];
+      for (let d = 0; d <= 30; d++){
+        const dd = evs.filter(e => e[0] === d);
+        dd.filter(e => e[1] > 0).forEach(e => { bb += e[1]; });
+        wait.slice().forEach(u => { if (bb >= u.amt){ bb -= u.amt; u.paid = d; wait.splice(wait.indexOf(u), 1); } });
+        dd.filter(e => e[1] < 0).forEach(e => { if (bb >= -e[1]) bb += e[1]; else { const u = { party: e[2].party, amt: -e[1], day: d, before: bb, paid: null }; unpaid.push(u); wait.push(u); } });
+      }
+      const imp = await p.evaluate(() => [...document.querySelectorAll('#sfImpact tbody tr')].map(r => Object.assign({ txt: r.innerText.replace(/\s+/g, ' ') }, r.dataset)));
+      console.log('impact:', imp.map(r => r.txt).join(' / '), '| sim', unpaid.map(u => u.party + ' ' + manT(u.amt) + ' +' + u.day + ' (잔고 ' + manT(u.before) + ') → +' + u.paid).join(', '));
+      const iu = imp.filter(r => r.k === 'unpaid'), isc = imp.find(r => r.k === 'score'), ili = imp.find(r => r.k === 'limit');
+      expect('영향: 지급 불가 매입 = 독립 시뮬레이션 (거래처 · 금액 · 결제일, 그날 잔고 < 금액)', unpaid.length >= 1 && iu.length === unpaid.length && iu.every((r, i) => r.party === unpaid[i].party && +r.amt === unpaid[i].amt && +r.day === unpaid[i].day && r.txt.includes('지급 불가') && r.txt.startsWith(unpaid[i].party + ' 결제')) &&
+        unpaid.every(u => u.before < u.amt), { iu, unpaid });
+      // 점수 = 플로우스코어 화면의 내 점수, 한도 = (점수 − 500) × 40만원 × (계산서 기한 지난 매출 있으면 0.7)
+      const tdue = x => { const [y, m] = x.issued.split('-').map(Number); return (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date(y, m, 10)); };
+      const lateTax = SB.sales.some(x => !(x.tax === 'issued' && (x.taxOn || x.issued) <= isoAt(0)) && tdue(x) < isoAt(0)), limF = v => Math.round(Math.max(0, v - 500) * 400000 * (lateTax ? 0.7 : 1));
+      const v0 = +isc.v, N = 40 * unpaid.length, v2 = Math.max(300, v0 - N), M = limF(v0) - limF(v2);
+      expect('영향: 플로우스코어 약 −N점 (N = 40 × 지급 불가 건수) · 가정값', +isc.pen === N && +isc.v2 === v2 && isc.txt.includes('약 −' + N + '점') && isc.txt.includes('가정값'), { isc, N });
+      expect('영향: 이용 한도 −M원 (M = limitInfo 식으로 줄어든 점수에서 다시 계산, 계산서 기한 지남 × 0.7 유지) · 가정값', +ili.lim === limF(v0) && +ili.m === M && +ili.lim2 === limF(v2) && ili.txt.includes('−' + manT(M)) && ili.txt.includes('가정값'), { ili, M, lateTax });
+      // 바꿀 수 있는 구간: 오늘 · 플로우페이 신청 마감(추천 매입 결제일 − 3) · 지급 불가 결제일 · 부족 시작 · 계산서 기한(묶은 미발행 매출 중 가장 이른). 같은 날은 한 줄
+      const recP = SB.purchases.find(x => x.id === rec.id), want4 = [[0, 'today'], [dOf(recP.due) - 3, 'fpApply'], ...unpaid.map(u => [u.day, 'pay']), [start, 'start']];
+      const tx = rec.sel.map(i => SB.sales.find(x => x.id === i)).filter(x => x.tax !== 'issued' && dOf(tdue(x)) >= 0).map(x => dOf(tdue(x)));
+      if (tx.length) want4.push([Math.min(...tx), 'tax']);
+      const wantDays = [...new Set(want4.map(w => w[0]))].sort((a, b) => a - b);
+      const marks = await p.evaluate(() => [...document.querySelectorAll('#sfMarks li')].map(l => ({ day: +l.dataset.day, k: l.dataset.k.split(','), txt: l.innerText.replace(/\s+/g, ' '), tip: !!l.querySelector('.itip') })));
+      console.log('timeline:', marks.map(m => m.txt).join(' / '));
+      expect('바꿀 수 있는 구간: 표시 = 계산한 날짜 (같은 날은 한 줄로) · 신청 마감 = 결제일 − 3일 · 계산서 기한 ⓘ', marks.map(m => m.day).join() === wantDays.join() && want4.every(w => marks.find(m => m.day === w[0]).k.includes(w[1])) &&
+        marks.every(m => m.txt.startsWith(m.day === 0 ? '오늘' : m.day > 0 ? 'D-' + m.day : (-m.day) + '일 지남')) && (!tx.length || marks.find(m => m.k.includes('tax')).tip) && marks.find(m => m.k.includes('fpApply')).day === dOf(recP.due) - 3, { marks, want4 });
+      if (SHOT) { await p.click('#sfSteps button >> nth=2'); await p.waitForTimeout(150); await shot('01j-shortfall-impact'); }
+      // 단계 표시줄: 4개 · "판단"을 누르면 그 단계가 지금 단계(aria-current)
+      await p.click('#sfSteps button >> nth=3'); await p.waitForTimeout(150);
+      const stepNow = await p.evaluate(() => [[...document.querySelectorAll('#sfSteps button')].map(b => b.textContent.trim()).join(','), document.querySelector('#sfSteps [aria-current="step"]').textContent.trim(), document.activeElement.id]);
+      expect('단계 표시줄 이상·이유·영향·판단 → "판단" 누르면 지금 단계 · 판단 제목에 포커스', stepNow[0] === '1 이상,2 이유,3 영향,4 판단' && stepNow[1] === '4 판단' && stepNow[2] === 'sfH4', stepNow);
+      // 보류: 사유 없이는 기록 불가, 기타는 메모 필수
+      const own = S => S.decisions.filter(d => !d.seeded), nDec = async () => own(await st()).length;  // 시나리오용 지난 판단(seeded)은 빼고 셈
+      await p.click('#dlgBody [data-act="shortHold"]'); await p.waitForTimeout(150);
+      const h0 = await p.evaluate(() => [document.getElementById('holdDlg').open, document.getElementById('holdOk').disabled, document.activeElement.name]);
+      await p.evaluate(() => document.getElementById('holdOk').click()); await p.waitForTimeout(80);
+      const n0 = await nDec();
+      await p.check('#holdBody input[value="기타"]'); await p.waitForTimeout(60);
+      const h1 = await p.evaluate(() => [document.getElementById('holdOk').disabled, document.getElementById('holdOk').textContent]);
+      await p.fill('#holdMemo', '   '); await p.waitForTimeout(60);
+      const h2 = await p.isDisabled('#holdOk');
+      await p.fill('#holdMemo', '다음 주 투자금 입금 예정'); await p.waitForTimeout(60);
+      const h3 = await p.isDisabled('#holdOk');
+      if (SHOT) await shot('01k-hold-picker');
+      console.log('hold picker: open', h0, '| 기타', h1, '| 공백 메모 disabled', h2, '| 메모 disabled', h3);
+      expect('보류: 사유를 고르기 전에는 "보류 기록" 비활성 · 눌러도 기록 없음', h0[0] && h0[1] && h0[2] === 'holdR' && n0 === 0, { h0, n0 });
+      expect('보류: 기타는 메모가 있어야 기록 가능(공백만은 안 됨)', h1[0] && h1[1] === '메모를 적어 주세요' && h2 && !h3, { h1, h2, h3 });
+      await p.click('#holdOk'); await p.waitForTimeout(150);
+      const SH = await st(), d1 = own(SH)[0], back1 = await p.evaluate(() => [document.getElementById('holdDlg').open, document.getElementById('dlg').open, document.activeElement.dataset.act]);
+      console.log('hold record:', JSON.stringify(d1), '| after', back1);
+      const pickOk = d => d.pick.kind === 'fp' && d.pick.id === rec.id && d.pick.party === recP.party && d.pick.amt === tot(recP) && d.pick.cost === rec.cost && d.sf.start === isoAt(start) && d.sf.need === -minV && d.date === isoAt(0) && d.result === null && typeof d.id === 'string';
+      expect('보류 → S.decisions 기록 { sf, pick, choice hold, reason, memo, by } · 사유 시트 닫히고 부족 해결 시트는 그대로(보류 버튼에 포커스)', own(SH).length === 1 && pickOk(d1) && d1.choice === 'hold' && d1.reason === '기타' && d1.memo === '다음 주 투자금 입금 예정' && d1.by === 'ceo' &&
+        !back1[0] && back1[1] && back1[2] === 'shortHold', { d1, back1 });
+      // Esc: 사유 시트부터 닫힘
+      await p.click('#dlgBody [data-act="shortHold"]'); await p.waitForTimeout(150);
+      await p.keyboard.press('Escape'); await p.waitForTimeout(120);
+      const esc1 = await p.evaluate(() => [document.getElementById('holdDlg').open, document.getElementById('dlg').open]);
+      expect('Esc는 사유 시트부터 닫음 (부족 해결 시트는 열린 채)', !esc1[0] && esc1[1], esc1);
+      // 승인 → 기록(approve) · 신청 시트(대상 = 추천) → 신청하면 그 신청 id가 기록에 붙음
+      await p.click('#dlgBody [data-act="shortGo"]'); await p.waitForTimeout(150);
+      const SA = await st(), da = SA.decisions[SA.decisions.length - 1], apT2 = await p.textContent('#dlgTitle'), apKv2 = (await p.locator('#dlgBody .kv').innerText()).replace(/\s+/g, ' ');
+      expect('승인 → S.decisions에 approve 기록 · 신청 시트(플로우페이 · 대상 = 추천 매입)', own(SA).length === 2 && da.choice === 'approve' && pickOk(da) && da.by === 'ceo' && apT2 === '플로우페이 신청' && apKv2.includes(recP.party), { da, apT2 });
+      await next(); await next();
+      while (await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').count()) { await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').first().click(); await p.waitForTimeout(120); }
+      await next(); await p.click('dialog [data-act="submitApply"]'); await p.waitForTimeout(150);
+      const SL = await st(), ap1 = SL.apps.find(a => a.refId === rec.id), dl = SL.decisions.find(d => d.id === da.id);
+      console.log('approve → app', ap1 && ap1.id, ap1 && ap1.status, '| decision appId', dl.appId, '| decisions', own(SL).length);
+      expect('승인 후 신청하면 그 신청 id가 판단 기록에 연결 · 기록은 하나', ap1 && dl.appId === ap1.id && own(SL).length === 2, { ap1, dl });
+      // 담당자: 승인 자리에 "대표 승인 요청"(채움 아님), 보류는 할 수 있음(by staff)
+      await p.evaluate(v => { const s = JSON.parse(v); s.role = 'staff'; localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); }, snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+      await go('home'); await p.click('#sigBox [data-act="shortSheet"]'); await p.waitForTimeout(150);
+      const sf0 = await p.evaluate(() => { const r = document.querySelector('#dlgBody .sf-opt[data-rec="1"]'); return [!!r.querySelector('[data-act="shortGo"]'), r.querySelector('[data-act="ceoReq"]') && r.querySelector('[data-act="ceoReq"]').textContent, !!r.querySelector('[data-act="shortHold"]'), document.querySelectorAll('#dlg button.primary').length]; });
+      await p.click('#dlgBody [data-act="shortHold"]'); await p.waitForTimeout(150);
+      await p.check('#holdBody input[value="비용 부담"]'); await p.click('#holdOk'); await p.waitForTimeout(150);
+      const ds = own(await st());
+      expect('담당자: "대표 승인 요청"(채움 버튼 없음) · 보류 기록 가능(by staff · 사유 비용 부담)', !sf0[0] && sf0[1] === '대표 승인 요청' && sf0[2] && sf0[3] === 0 && ds.length === 1 && ds[0].by === 'staff' && ds[0].choice === 'hold' && ds[0].reason === '비용 부담' && ds[0].memo === '', { sf0, ds });
+      await p.keyboard.press('Escape'); await p.waitForTimeout(120);
+      await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt(); }
+
     // 0-2. 자금일보 보고서형: 기준 줄(전일 대비) · 탭 전환(누르기·화살표·기억) · 두 줄 예측 · 받을 돈 나이 막대 · 거래처 쏠림 (시작 시나리오, 독립 계산과 비교)
     await go('report');
     const selTab = () => p.evaluate(() => [...document.querySelectorAll('#reportBody [role="tab"]')].filter(t => t.getAttribute('aria-selected') === 'true').map(t => t.dataset.tab + (document.getElementById(t.getAttribute('aria-controls')).hidden ? '(hidden)' : '')).join());
@@ -285,6 +385,210 @@ const SHOT = process.argv[3];
     const t4 = await selTab();
     expect('다시 불러와도 마지막 탭(줄 돈) · Home → 요약', t3 === 'ap' && t4 === 'sum', { t3, t4 });
     if (SHOT) { await p.evaluate(() => document.activeElement.blur()); await top(); await shot('01c-report-summary'); } }
+
+  // 0-3. 자금일보 신뢰 장치(v7): 합계 일치(미확인 입금 → 매출 연결) · 평소 범위 타일 (시작 시나리오, 점검 뒤 원래 기록으로 되돌림)
+  //   날짜는 고정값이 아니라 관계(오늘 · 7일씩 앞선 12번의 기준일)로 다시 계산해 비교
+  { const snap0 = await p.evaluate(() => localStorage.getItem('flowpoint-test-v6')), S0 = await st();
+    const dOf = s => { const [y, m, d] = s.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - dAt(0)) / 864e5); };
+    const btw = (a, z) => dOf(z) - dOf(a), tot = x => Math.round(x.qty * x.price * 1.1), manT = v => Math.round(v / 10000).toLocaleString('ko-KR') + '만원';
+    const manS = v => (v < 0 ? '−' : '') + Math.abs(Math.round(v / 10000)).toLocaleString('ko-KR') + '만원', sgn = v => (v > 0 ? '+' : '') + manS(v);
+    const sim = S => { const ev = []; S.purchases.forEach(x => { if (x.status === 'ordered') ev.push([Math.max(0, dOf(x.due)), -tot(x)]); });
+      S.sales.forEach(x => { if (x.status === 'open' && dOf(x.due) >= 0) ev.push([dOf(x.due), tot(x)]); });
+      const bal = []; let b = S.cash; for (let d = 0; d <= 30; d++){ b += ev.filter(e => e[0] === d).reduce((t, e) => t + e[1], 0); bal.push(b); } return bal; };
+    const sfOf = bal => { const s = bal.findIndex(v => v < 0), lo = Math.min(...bal); return s < 0 ? null : { start: s, min: bal.indexOf(lo), amt: lo }; };
+    await go('report'); await p.click('#rpTab-sum'); await p.waitForTimeout(120);
+    // (1) 연결 전: 차이 = 미확인 입금 합계 · 예측은 장부 잔고(미확인 입금 제외)에서 시작하고 누리상회 매출은 입금 예정일에 그대로 → 두 번 잡히지 않음
+    const um = S0.bank.unmatched, gap = um.reduce((a, u) => a + u.amt, 0), u0 = um[0];
+    const pill0 = (await p.textContent('#rpRecon')).trim(), sure0 = await p.locator('#chart2').evaluate(s => s.dataset.sure.split(',').map(Number)), base0 = sim(S0), sf0 = sfOf(base0);
+    const amtSales = S0.sales.filter(x => x.status === 'open' && tot(x) === u0.amt), nuri = amtSales.find(x => x.party === '누리상회');
+    console.log('recon before:', pill0, '| unmatched', um.map(u => u.sender + ' ' + u.amt + ' ' + u.date).join(', '), '| book', S0.cash, '| bank', S0.cash + gap, '| 금액 같은 매출', amtSales.map(x => x.party + (dOf(x.due) < 0 ? '(연체)' : '+' + dOf(x.due))).join(', '));
+    expect('연결 전: 맨 위 "차이 330만원 · 확인 필요" (은행 = 장부 + 미확인 입금 ㈜누리 330만원, 오늘)', um.length === 1 && u0.amt === 3300000 && u0.sender === '㈜누리' && u0.date === isoAt(0) && pill0 === '차이 ' + manT(gap) + ' · 확인 필요 ›' &&
+      (await p.locator('#rpRecon .tag.warn').count()) === 1, { pill0, um });
+    expect('연결 전 예측에 미확인 입금 없음: 0일 잔고 = 장부 잔고 · 누리상회 330만원은 입금 예정일에 한 번 (독립 계산과 같음)', sure0.every((v, d) => v === base0[d]) && sure0[0] !== base0[0] + gap && nuri && dOf(nuri.due) > 0 && base0[dOf(nuri.due)] - base0[dOf(nuri.due) - 1] >= 0, { s0: sure0[0], cash: S0.cash });
+    // (2) 평소 범위 타일: 오늘 값과 직전 12주(오늘 − 7k일, k = 1..12) 값을 그날 기준(있던 거래 · 그날 상태)으로 따로 계산
+    const tdue = x => { const [y, m] = x.issued.split('-').map(Number); return (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date(y, m, 10)); };
+    const at = (S, a) => { const ex = x => (x.issued || x.ordered || x.due) <= a, paid = x => x.paidOn && x.paidOn <= a, a7 = isoAt(dOf(a) + 7), sm = L => L.reduce((t, x) => t + tot(x), 0);
+      const ls = S.sales.filter(ex), lp = S.purchases.filter(ex), ar = ls.filter(x => !paid(x) && x.status !== 'factored' && x.status !== 'bundled'), ap = lp.filter(x => !paid(x) && x.status !== 'financed' && x.status !== 'repaid'), arT = sm(ar);
+      const pd = ls.filter(x => paid(x) && btw(x.paidOn, a) < 90).map(x => btw(x.issued, x.paidOn)), td = ls.filter(x => tdue(x) < a), by = {};
+      ar.forEach(x => { by[x.party] = (by[x.party] || 0) + tot(x); });
+      return { coll: pd.length ? pd.reduce((t, v) => t + v, 0) / pd.length : null, od: arT ? sm(ar.filter(x => x.due < a)) / arT : null,
+        tax: td.length ? td.filter(x => x.tax === 'issued' && (x.taxOn || x.issued) <= tdue(x)).length / td.length : null,
+        top3: arT ? Object.values(by).sort((u, v) => v - u).slice(0, 3).reduce((t, v) => t + v, 0) / arT : null,
+        ap: ls.length + lp.length ? sm(ap) : null, net7: ls.length + lp.length ? sm(ar.filter(x => x.due >= a && x.due <= a7)) - sm(ap.filter(x => x.due <= a7)) : null }; };
+    const FMT = { coll: v => Math.round(v) + '일', od: v => Math.round(v * 1000) / 10 + '%', tax: v => Math.round(v * 100) + '%', top3: v => Math.round(v * 100) + '%', ap: manS, net7: sgn };
+    const now0 = at(S0, isoAt(0)), past = [...Array(12)].map((_, i) => at(S0, isoAt(-7 * (i + 1))));
+    const want = Object.keys(FMT).map(k => { const vs = past.map(w => w[k]).filter(v => v != null), lo = vs.length ? Math.min(...vs) : null, hi = vs.length ? Math.max(...vs) : null, v = now0[k];
+      return { k, v, lo, hi, n: vs.length, st: vs.length < 8 || v == null ? 'few' : v > hi ? 'high' : v < lo ? 'low' : 'in' }; });
+    const tiles = await p.locator('#rpTiles .rp-tile').evaluateAll(ts => ts.map(t => ({ k: t.dataset.k, st: t.dataset.st, n: +t.dataset.n, v: t.dataset.v == null ? null : +t.dataset.v, lo: t.dataset.lo == null ? null : +t.dataset.lo, hi: t.dataset.hi == null ? null : +t.dataset.hi,
+      val: t.querySelector('.rp-tv').textContent, rg: t.querySelector('.rp-rg').innerText.replace(/\s+/g, ' ').trim(), out: t.classList.contains('out'), bold: getComputedStyle(t.querySelector('.rp-tv')).fontWeight, aria: t.getAttribute('aria-label'), role: t.getAttribute('role') })));
+    tiles.forEach(t => { const w = want.find(x => x.k === t.k); console.log('   tile', t.k, '|', t.val, '|', t.rg, '| n', t.n, '| 독립', w && [w.v == null ? '-' : FMT[t.k](w.v), w.lo == null ? '-' : FMT[t.k](w.lo) + '~' + FMT[t.k](w.hi), w.st].join(' ')); });
+    const near = (x, y) => x == null || y == null ? x === y : Math.abs(x - y) < 1e-9;
+    expect('평소 범위 타일 6개(2열) · 순서 회수 일수 · 연체율 · 계산서 · 쏠림 · 결제 전 매입 · 7일 순유입 · 잔고 타일 없음', tiles.map(t => t.k).join() === 'coll,od,tax,top3,ap,net7' &&
+      await p.locator('#rpTiles').evaluate(g => getComputedStyle(g).gridTemplateColumns.split(' ').length === 2) && !(await p.locator('#rpTiles', { hasText: '잔고' }).count()) && (await p.locator('#rpPanel-sum #rpTiles').count()) === 1 && !(await p.locator('#v-home #rpTiles, #v-home .rp-tile').count()), tiles.map(t => t.k));
+    expect('타일 값 · 범위 · 주 수 · 상태 = 독립 계산 (오늘 기준과 7일씩 앞선 12번의 기준일)', tiles.every(t => { const w = want.find(x => x.k === t.k); return w && near(t.v, w.v) && near(t.lo, w.lo) && near(t.hi, w.hi) && t.n === w.n && t.st === w.st && t.val === (w.v == null ? '—' : FMT[t.k](w.v)); }),
+      tiles.map(t => [t, want.find(x => x.k === t.k)]).filter(([t, w]) => !w || !near(t.v, w.v) || !near(t.lo, w.lo) || !near(t.hi, w.hi) || t.n !== w.n || t.st !== w.st));
+    const apT = tiles.find(t => t.k === 'ap'), apW = want.find(w => w.k === 'ap');
+    expect('결제 전 매입: 평소 범위 밖(높음) · 굵은 주황 숫자 + "높음 평소 a~b"', apT.st === 'high' && apW.v > apW.hi && apT.out && +apT.bold >= 700 && /^높음 ?평소 [\d,]+~[\d,]+만원$/.test(apT.rg) && apT.rg.endsWith(manT(apW.hi)), apT);
+    const inT = tiles.filter(t => t.st === 'in'), fewT = tiles.filter(t => t.st === 'few');
+    expect('범위 안 타일은 "평소 범위"(회색 · 굵지 않음 · 강조 없음)', inT.length >= 1 && inT.every(t => t.rg === '평소 범위' && !t.out && +t.bold < 700), inT);
+    expect('기록이 8주 미만인 타일은 "기록 부족" (회수 일수: 입금 기록이 있는 주 < 8)', fewT.length >= 1 && fewT.some(t => t.k === 'coll') && fewT.every(t => t.rg === '기록 부족' && !t.out && t.n < 8), fewT);
+    expect('타일마다 이름 있는 묶음(role=group) · aria-label에 이름 · 값 · 상태 · 범위 숫자', tiles.every(t => t.role === 'group' && t.aria.includes(t.val) && (t.st === 'few' ? t.aria.includes('기록 부족') : /직전 12주 .*\d/.test(t.aria) && t.aria.includes(t.st === 'in' ? '평소 범위' : t.st === 'high' ? '높음' : '낮음'))), tiles.map(t => t.aria));
+    await p.click('#rpNormH .itip'); await p.waitForTimeout(80);
+    const normTip = (await p.textContent('#tip-rpNorm')).replace(/\s+/g, ' ');
+    expect('ⓘ에 직전 12주 정의 · 타일별 식', normTip.includes('직전 12주 = 오늘에서 7일씩 앞선 날 12번') && normTip.includes(mdAt(-7)) && normTip.includes(mdAt(-84)) && ['받을 돈 회수 일수 =', '연체율 =', '계산서 기한 내 발행 =', '결제 전 매입 =', '7일 순유입 ='].every(s => normTip.includes(s)), normTip);
+    await p.click('#rpNormH .itip'); await p.waitForTimeout(60);
+    if (SHOT) { await into('#rpNormH', 24); await shot('01l-report-tiles'); }
+    if (SHOT) { await into('#rpRecon', 200); await shot('01f-report-recon'); }
+    // (3) 연결 시트: 금액 같은 입금 전 매출 = 후보, 이름 일치(㈜누리 ↔ 누리상회) 1건 추천 · 고른 상태, 나머지는 "다른 매출"
+    await p.click('#rpRecon'); await p.waitForTimeout(150);
+    const sh = await p.evaluate(() => ({ title: document.getElementById('dlgTitle').textContent, amt: document.getElementById('rcAmt').textContent, kv: document.getElementById('rcKv').innerText.replace(/\s+/g, ' '),
+      rec: [...document.querySelectorAll('#rcRec input')].map(i => [i.value, i.checked, i.closest('label').innerText.replace(/\s+/g, ' ')]), other: [...document.querySelectorAll('#rcOther input')].map(i => [i.value, i.checked, i.closest('label').innerText.replace(/\s+/g, ' ')]),
+      otherH: (document.getElementById('rcOtherH') || {}).textContent, primary: document.querySelectorAll('#dlg button.primary').length, focus: document.activeElement.name + ':' + document.activeElement.value }));
+    console.log('recon sheet:', sh.title, sh.amt, '|', sh.kv, '| 추천', sh.rec.map(r => r[2]).join(), '| 다른', sh.other.map(r => r[2]).join(' / '), '| focus', sh.focus);
+    const byDue = amtSales.filter(x => x !== nuri).sort((a, z) => a.due < z.due ? -1 : 1).map(x => x.id);
+    expect('연결 시트: 은행 = 장부 + 차이 · 후보 = 금액 같은 입금 전 매출 전부(3건)', sh.title === '미확인 입금' && sh.amt === manT(u0.amt) && sh.kv === '은행 잔고 ' + (S0.cash + gap).toLocaleString('ko-KR') + '원 장부 잔고 ' + S0.cash.toLocaleString('ko-KR') + '원 차이 ' + gap.toLocaleString('ko-KR') + '원' &&
+      amtSales.length === 3 && sh.rec.length + sh.other.length === amtSales.length && [...sh.rec, ...sh.other].every(r => amtSales.some(x => x.id === r[0])), sh);
+    expect('추천 = 누리상회(이름 · 금액 일치, 고른 상태 · 포커스) · 다른 매출 = 나머지(입금 예정일 순, 금액만 일치)', sh.rec.length === 1 && sh.rec[0][0] === nuri.id && sh.rec[0][1] && sh.rec[0][2].includes('추천') && sh.rec[0][2].includes('이름 · 금액 일치') &&
+      sh.otherH === '다른 매출' && sh.other.map(r => r[0]).join() === byDue.join() && sh.other.every(r => !r[1] && r[2].includes('금액만 일치')) && sh.focus === 'rcPick:' + nuri.id && sh.primary === 1, sh);
+    if (SHOT) await shot('01g-recon-sheet');
+    // (4) 연결 → 누리상회 입금 확인(오늘 · 장부 잔고 + 330만원) · 미확인 입금 없음 → "합계 일치 ✓" · 은행 = 장부 · 부족 날짜와 금액 그대로
+    await p.click('#dlgFoot [data-act="reconLink"]'); await p.waitForTimeout(150);
+    const S1 = await st(), n1 = S1.sales.find(x => x.id === nuri.id), base1 = sim(S1), sf1 = sfOf(base1), pill1 = (await p.textContent('#rpRecon')).trim();
+    const back = await p.evaluate(() => [document.getElementById('dlg').open, document.activeElement.id]);
+    const rpSf1 = (await p.textContent('#sfCallout .sf-date')).trim(), rpAmt1 = (await p.textContent('#sfCallout .sf-amt')).trim();
+    console.log('recon after:', pill1, '| toast', await p.textContent('#toast'), '| book', S0.cash, '→', S1.cash, '| bank', S1.cash + S1.bank.unmatched.reduce((a, u) => a + u.amt, 0), '| 누리상회', n1.status, n1.paidOn, '| 부족', JSON.stringify(sf0), '→', JSON.stringify(sf1), '|', rpSf1, rpAmt1);
+    expect('연결 후 "합계 일치 ✓" · 시트 닫히고 합계 알약에 포커스', pill1 === '합계 일치 ✓' && (await p.locator('#rpRecon .tag.ok').count()) === 1 && !back[0] && back[1] === 'rpRecon', { pill1, back });
+    expect('연결 = 입금 확인: 누리상회 입금 완료(오늘) · 장부 + 330만원 · 미확인 입금 0건 · 연결 기록 1건 · 은행 = 장부', n1.status === 'paid' && n1.paidOn === isoAt(0) && S1.cash === S0.cash + u0.amt && S1.bank.unmatched.length === 0 &&
+      S1.bank.matched.length === 1 && S1.bank.matched[0].saleId === nuri.id && S1.cash + 0 === S0.cash + gap && S1.log.some(l => l.date === isoAt(0) && l.amt === u0.amt && l.label === '누리상회 입금'), { cash: S1.cash, bank: S1.bank });
+    expect('부족 날짜 · 최저일 · 금액 그대로 (입금 예정일 전 잔고만 +330만원, 그날부터 같음)', sf0 && sf1 && sf1.start === sf0.start && sf1.min === sf0.min && sf1.amt === sf0.amt && rpSf1 === mdAt(sf0.start) + '부터 · D-' + sf0.start && rpAmt1 === manT(-sf0.amt) + ' 부족' &&
+      base1.every((v, d) => d < dOf(nuri.due) ? v === base0[d] + u0.amt : v === base0[d]), { sf0, sf1, rpSf1, rpAmt1 });
+    // 연결 뒤 부족 해결 이유 폭포: 오늘 잔고 = 장부 + 330만원(한 번) · 누리상회 입금은 폭포에서 빠짐 · 여전히 합계 일치 ✓ (두 번 잡히지 않음)
+    await p.click('#sfCallout [data-act="shortSheet"]'); await p.waitForTimeout(150);
+    const wf1 = await p.evaluate(() => ({ first: +document.querySelector('#sfWf li').dataset.amt, sum: [...document.querySelectorAll('#sfWf li')].filter(l => l.dataset.day != null).reduce((a, l) => a + +l.dataset.amt, 0),
+      chk: Object.assign({}, document.getElementById('sfWfChk').dataset), txt: document.getElementById('sfWfChk').innerText.replace(/\s+/g, ' '), nuri: [...document.querySelectorAll('#sfWf li')].some(l => l.innerText.includes('누리상회')) }));
+    console.log('waterfall after link:', JSON.stringify(wf1));
+    expect('연결 뒤 이유 폭포: 오늘 잔고 = 장부 + 330만원 · 누리상회 입금 줄 없음 · 합계 = 예측 최저 · "합계 일치 ✓"', wf1.first === S1.cash && wf1.first + wf1.sum === sf1.amt && +wf1.chk.want === sf1.amt && wf1.chk.gap === '0' && wf1.txt.includes('합계 일치 ✓') && !wf1.nuri, wf1);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(120);
+    await p.click('#rpRecon'); await p.waitForTimeout(150);
+    const kv1 = await p.evaluate(() => [document.getElementById('dlgTitle').textContent, document.getElementById('rcKv').innerText.replace(/\s+/g, ' '), (document.getElementById('rcLast') || {}).textContent]);
+    console.log('recon sheet after:', kv1.join(' | '));
+    expect('연결 후 시트: 은행 잔고 = 장부 잔고 · 차이 0원 · 연결 기록', kv1[0] === '합계 일치' && kv1[1] === '은행 잔고 ' + S1.cash.toLocaleString('ko-KR') + '원 장부 잔고 ' + S1.cash.toLocaleString('ko-KR') + '원 차이 0원' && kv1[2].startsWith('누리상회 330만원 입금 확인'), kv1);
+    if (SHOT) { await p.keyboard.press('Escape'); await p.waitForTimeout(120); await into('#rpRecon', 200); await shot('01h-report-recon-ok'); }
+    expect('자금일보 요약 채움 버튼은 여전히 1개(부족 해결)', (await p.locator('#rpPanel-sum button.primary, #rpPanel-sum button.hot').count()) === 1 && (await p.locator('#reportBody > header button.primary, #reportBody > header button.hot').count()) === 0, null);
+    // 담당자도 연결할 수 있음(장부 정리)
+    await p.evaluate(v => { const s = JSON.parse(v); s.role = 'staff'; localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); }, snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt(); await go('report');
+    await p.click('#rpRecon'); await p.waitForTimeout(150); await p.click('#dlgFoot [data-act="reconLink"]'); await p.waitForTimeout(150);
+    const S2 = await st();
+    expect('담당자도 미확인 입금 연결 가능 → 합계 일치', S2.role === 'staff' && S2.bank.unmatched.length === 0 && S2.sales.find(x => x.id === nuri.id).status === 'paid' && (await p.textContent('#rpRecon')).trim() === '합계 일치 ✓', S2.bank);
+    // 예전 저장 기록(은행 칸 없음) 이전: 입금 전 누리상회 330만원이 있으면 미확인 입금 1건, 이미 입금 확인했으면 0건
+    //   (불러올 때 이전만 하고 저장은 하지 않으므로 화면의 합계 알약으로 확인)
+    const pillNow = async () => { await go('report'); return [(await p.textContent('#rpRecon')).trim(), +(await p.getAttribute('#rpRecon', 'data-gap'))]; };
+    await p.evaluate(v => { const s = JSON.parse(v); delete s.bank; localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); }, snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    const M1 = await pillNow();
+    await p.evaluate(([v, id]) => { const s = JSON.parse(v); delete s.bank; const x = s.sales.find(y => y.id === id); x.status = 'paid'; x.paidOn = s.log[0].date; localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); }, [snap0, nuri.id]); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    const M2 = await pillNow();
+    console.log('migration: 누리상회 입금 전', M1.join(' '), '| 입금 확인 뒤', M2.join(' '));
+    expect('예전 기록 이전: 누리상회 입금 전 → 미확인 입금 330만원("차이 330만원") / 입금 확인 뒤 → 없음("합계 일치 ✓")', M1[0] === '차이 330만원 · 확인 필요 ›' && M1[1] === 3300000 && M2[0] === '합계 일치 ✓' && M2[1] === 0, { M1, M2 });
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt(); }
+
+  // 0-4. 입금 확인이 미확인 입금을 소진(v7 단계 4 버그 수정): 이름 · 금액이 맞는 매출을 어느 경로로든 입금 확인하면 그 입금을 연결 → 은행에 두 번 잡히지 않음 (점검 뒤 되돌림)
+  { const snap0 = await p.evaluate(() => localStorage.getItem('flowpoint-test-v6')), S0 = await st();
+    const dOf = s => { const [y, m, d] = s.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - dAt(0)) / 864e5); };
+    const nuri = S0.sales.find(x => x.status === 'open' && x.party === '누리상회'), pill = async () => { await go('report'); await p.click('#rpTab-sum'); await p.waitForTimeout(80); return (await p.textContent('#rpRecon')).trim(); };
+    // (a) 줄의 "입금 확인": 입금 예정일 당일로 날짜를 옮기면 누리상회 줄 버튼이 입금 확인
+    await p.evaluate(([v, n]) => { const s = JSON.parse(v); s.dayOffset = n; localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); }, [snap0, dOf(nuri.due)]); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    await go('sales'); const rb = p.locator('#saleRows li.tr-row:visible', { hasText: '누리상회' }).locator('[data-act="paid"]'), nRb = await rb.count();
+    const c0 = (await st()).cash; await rb.first().click(); await p.waitForTimeout(150);
+    const A1 = await st(), pa = await pill();
+    console.log('bugfix row 입금 확인:', '누리상회 줄 버튼', nRb, '| pill', pa, '| unmatched', A1.bank.unmatched.length, '| matched', A1.bank.matched.map(m => m.sender + '→' + m.saleId).join(), '| cash +', A1.cash - c0);
+    expect('줄 "입금 확인"(누리상회) → 미확인 입금 ㈜누리 소진 · "합계 일치 ✓" · 장부 +330만원 한 번', nRb === 1 && pa === '합계 일치 ✓' && A1.bank.unmatched.length === 0 && A1.bank.matched.length === 1 && A1.bank.matched[0].saleId === nuri.id &&
+      A1.sales.find(x => x.id === nuri.id).status === 'paid' && A1.cash - c0 === 3300000, { nRb, pa, bank: A1.bank });
+    // (b) 상세 시트의 "입금 확인"(오늘 날짜) → 같음
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    await go('sales'); await clickRow('saleRows', '누리상회', 'paid');
+    const A2 = await st(), pb = await pill();
+    expect('상세 시트 "입금 확인"(누리상회) → "합계 일치 ✓"', pb === '합계 일치 ✓' && A2.bank.unmatched.length === 0 && A2.bank.matched[0].saleId === nuri.id, { pb, bank: A2.bank });
+    // (c) 금액만 같고 이름이 다른 매출(한결푸드 330만원) 입금 확인은 미확인 입금을 건드리지 않음
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    await go('sales'); await p.locator('#saleRows li.tr-row:visible', { hasText: '한결푸드' }).filter({ hasText: '330만원' }).locator('.tr-open').click(); await p.waitForTimeout(120);
+    await p.click('#dlgBody [data-act="paid"]'); await p.waitForTimeout(150);
+    const A3 = await st(), pc = await pill();
+    console.log('bugfix detail:', pb, '| 한결푸드 330만원(이름 다름):', pc, A3.bank.unmatched.length);
+    expect('이름이 다른 같은 금액 매출(한결푸드 330만원) 입금 확인 → 미확인 입금 그대로("차이 330만원")', pc === '차이 330만원 · 확인 필요 ›' && A3.bank.unmatched.length === 1 && A3.bank.matched.length === 0, { pc, bank: A3.bank });
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt(); }
+
+  // 0-5. 근거 원장(v7 단계 4): 시나리오용 지난 판단 2건 · 학습 데이터 N건 = 결과가 붙은 기록 · 지난 같은 상황(부족 해결 판단) · 새 보류 → 진행 중 → 부족 시작일 지나면 규칙대로 결과 (점검 뒤 되돌림)
+  const ledGo = async () => { await go('score'); await p.click('#scSeg [data-sc="me"]'); await p.waitForTimeout(100); };
+  const ledRows = () => p.evaluate(() => [...document.querySelectorAll('#scLedger .led-rec')].map(l => ({ id: l.dataset.id, res: l.dataset.res, seeded: l.dataset.seeded === '1', tag: l.querySelector('.led-tag .tag').textContent,
+    tagCls: l.querySelector('.led-tag .tag').className, sc: (l.querySelector('.led-h > .tag.mute') || {}).textContent || '', txt: l.innerText.replace(/\s+/g, ' ') })));
+  const ledN = async () => +(await p.textContent('#scLedN'));
+  { const snap0 = await p.evaluate(() => localStorage.getItem('flowpoint-test-v6')), S0 = await st();
+    const dOf = s => { const [y, m, d] = s.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - dAt(0)) / 864e5); };
+    const tot = x => Math.round(x.qty * x.price * 1.1), manT = v => Math.round(v / 10000).toLocaleString('ko-KR') + '만원', mdI = s => mdAt(dOf(s)), mdS = s => (([, m, d]) => +m + '/' + +d)(s.split('-'));
+    // 시나리오용 2건: 늦게 지급한 매입(한빛패키지 1일 · 미래라벨) 결제일 2일 전 판단, 부족 시작 = 결제일
+    const hb = S0.purchases.find(x => x.party === '한빛패키지' && x.paidOn && dOf(x.paidOn) - dOf(x.due) === 1), ml = S0.purchases.find(x => x.party === '미래라벨' && x.paidOn && x.paidOn > x.due);
+    const sd = S0.decisions.filter(d => d.seeded), W = [[ml, 600000, '다른 자금으로 해결', 'unresolved', '부족 미해소'], [hb, 400000, '매입처와 결제일 조정', 'resolved', '부족 해소']];
+    console.log('seeded:', sd.map(d => [d.date, d.sf.start, d.sf.need, d.reason, d.result.k, d.result.note].join(' · ')).join(' / '));
+    expect('시나리오용 지난 판단 2건 = 보류 · 날짜는 늦게 지급한 매입에 맞춤(결제일 − 2일 판단 · 부족 시작 = 결제일)', sd.length === 2 && W.every(([x, need, reason, k]) => x && sd.some(d => d.choice === 'hold' && d.pick.id === x.id && d.date === isoAt(dOf(x.due) - 2) && d.sf.start === x.due && d.sf.need === need && d.reason === reason && d.result.k === k)) &&
+      sd.find(d => d.pick.id === ml.id).result.note === '미래라벨 ' + manT(tot(ml)) + ' ' + (dOf(ml.paidOn) - dOf(ml.due)) + '일 늦게 지급 (' + mdS(ml.paidOn) + ')', sd);
+    await ledGo(); let R = await ledRows();
+    console.log('ledger:', 'N', await ledN(), '|', R.map(r => r.txt).join(' / '));
+    expect('플로우스코어 근거 원장: 시나리오용 2건(최신 순) · "시나리오용" 태그 · 결과 색 + 단어 · 학습 데이터 2건', R.length === 2 && (await ledN()) === 2 && R.every(r => r.seeded && r.sc === '시나리오용') &&
+      R.every((r, i) => { const [x, need, reason, k, word] = W[i]; return r.res === k && r.tag === word && r.tagCls.includes(k === 'resolved' ? 'ok' : 'bad') && r.txt.startsWith(mdAt(dOf(x.due) - 2)) &&
+        r.txt.includes('상황 ' + manT(need) + ' 부족 · ' + mdI(x.due) + '부터') && r.txt.includes('결정 보류 · ' + reason) && r.txt.includes('결정자 대표'); }), R);
+    await p.click('#scLedH .itip'); await p.waitForTimeout(60);
+    const ledTip = (await p.textContent('#tip-scLed')).trim(); await p.click('#scLedH .itip'); await p.waitForTimeout(60);
+    expect('근거 원장 ⓘ: 기록·표시만(점수 산식 반영 안 함) · 학습 데이터 안내 · 결과 규칙은 따로 ⓘ', ledTip === '기록·표시만 하며 점수 산식에는 반영하지 않아요. 결정과 결과가 쌓이면 다음 추천의 근거와 플로우스코어 학습 데이터가 됩니다.' && (await p.locator('#tip-scLedRule').count()) === 1, ledTip);
+    // 부족 해결 시트 판단 구간: 지난 같은 상황(결과 붙은 최근 3건까지)
+    await go('home'); await p.click('#sigBox [data-act="shortSheet"]'); await p.waitForTimeout(150);
+    const past = () => p.evaluate(() => [...document.querySelectorAll('#sfPast tbody tr')].map(r => ({ id: r.dataset.id, res: r.dataset.res, txt: r.innerText.replace(/\s+/g, ' ') })));
+    const P0 = await past(), inS4 = await p.evaluate(() => !!document.querySelector('#sfS4 #sfPast') && document.getElementById('sfPastH').textContent);
+    console.log('지난 같은 상황:', inS4, '|', P0.map(r => r.txt).join(' / '));
+    expect('부족 해결 판단 구간 "지난 같은 상황": 결과 붙은 기록 최신 순(미래라벨 부족 미해소 → 한빛패키지 부족 해소) · 시점 · 결정(사유) · 결과', inS4 === '지난 같은 상황' && P0.length === 2 &&
+      P0[0].res === 'unresolved' && P0[0].txt.startsWith(mdS(isoAt(dOf(ml.due) - 2))) && P0[0].txt.includes('보류 다른 자금으로 해결') && P0[0].txt.includes('부족 미해소') &&
+      P0[1].res === 'resolved' && P0[1].txt.includes('보류 매입처와 결제일 조정') && P0[1].txt.includes('부족 해소'), P0);
+    if (SHOT) { await p.click('#sfSteps button >> nth=3'); await p.waitForTimeout(150); await into('#sfPastH', 0); await shot('01i-shortfall-past'); }
+    // 새 보류 → 진행 중(학습 데이터에 안 셈) · 지난 같은 상황에도 안 나옴
+    await p.click('#dlgBody [data-act="shortHold"]'); await p.waitForTimeout(150);
+    await p.check('#holdBody input[value="다른 자금으로 해결"]'); await p.click('#holdOk'); await p.waitForTimeout(150);
+    const P1 = await past(); await p.keyboard.press('Escape'); await p.waitForTimeout(120);
+    const S1 = await st(), nd = S1.decisions.find(d => !d.seeded);
+    await ledGo(); R = await ledRows();
+    console.log('new hold:', JSON.stringify({ date: nd.date, sf: nd.sf, reason: nd.reason, result: nd.result }), '| ledger', R[0].txt, '| N', await ledN());
+    expect('새 보류 → 근거 원장 맨 위 "진행 중"(회색) · 시나리오용 아님 · 학습 데이터는 그대로 2건', nd && nd.result === null && R.length === 3 && R[0].id === nd.id && R[0].res === 'wait' && R[0].tag === '진행 중' && R[0].tagCls.includes('mute') && !R[0].seeded && R[0].sc === '' &&
+      R[0].txt.includes('결과 ' + mdI(nd.sf.start) + '이 지나면 붙어요') && (await ledN()) === 2 && P1.length === 2 && !P1.some(r => r.id === nd.id), { nd, R0: R[0] });
+    // 부족 시작일 당일까지는 진행 중, 지나면 규칙대로: 시작일부터 장부 잔고 < 0 → 미해소 / 판단일~시작일 결제 매입을 못 냈거나 늦게 냄 → 미해소 / 아니면 해소
+    const st0 = dOf(nd.sf.start);
+    await p.evaluate(([v, n]) => { const s = JSON.parse(v); s.dayOffset = n; localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); }, [JSON.stringify(await st()), st0]); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    const onStart = (await st()).decisions.find(d => d.id === nd.id).result;
+    await p.click('footer [data-shift="1"]'); await p.waitForTimeout(150); await closePrompt();
+    const S2 = await st(), d2 = S2.decisions.find(d => d.id === nd.id), t2 = isoAt(st0 + 1);
+    const book = x => S2.cash - S2.log.filter(l => l.date > x).reduce((a, l) => a + l.amt, 0);
+    const negDay = [nd.sf.start, ...S2.log.filter(l => l.date > nd.sf.start && l.date <= t2).map(l => l.date)].sort().find(x => book(x) < 0);
+    const win = S2.purchases.filter(x => x.due >= nd.date && x.due <= nd.sf.start).sort((a, z) => a.due < z.due ? -1 : 1), openP = win.find(x => x.status === 'ordered'), lateP = win.find(x => x.status === 'paid' && x.paidOn > x.due);
+    const wantK = negDay || openP || lateP ? 'unresolved' : 'resolved', wantNote = negDay ? null : openP ? openP.party + ' ' + manT(tot(openP)) + ' 미지급 (결제일 ' + mdS(openP.due) + ')' : lateP ? null : '잔고 0원 아래로 안 감';
+    await ledGo(); R = await ledRows(); const r2 = R.find(r => r.id === nd.id);
+    console.log('after start:', 'on start', onStart, '| +1', JSON.stringify(d2.result), '| want', wantK, wantNote, '| ledger', r2.txt, '| N', await ledN());
+    expect('부족 시작일 당일까지는 결과 없음(진행 중)', onStart === null, onStart);
+    expect('부족 시작일 다음 날 → 규칙대로 결과(독립 계산) · 학습 데이터 3건 · 태그 색 + 단어', d2.result && d2.result.k === wantK && (!wantNote || d2.result.note === wantNote) && d2.result.date === t2 && (await ledN()) === 3 &&
+      r2.res === wantK && r2.tag === (wantK === 'resolved' ? '부족 해소' : '부족 미해소') && r2.tagCls.includes(wantK === 'resolved' ? 'ok' : 'bad') && r2.txt.includes('결과 ' + d2.result.note), { result: d2.result, wantK, wantNote });
+    if (SHOT) { await into('#scLedH', 24); await shot('04a-score-ledger'); }
+    // 다시 불러오거나 날짜를 더 옮겨도 붙은 결과는 그대로 (시나리오용도 그대로)
+    await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    await p.click('footer [data-shift="7"]'); await p.waitForTimeout(150); await closePrompt();
+    const S3 = await st();
+    expect('결과는 한 번만: 다시 불러오기 · +7일 뒤에도 같은 결과 · 시나리오용 결과 그대로', JSON.stringify(S3.decisions.find(d => d.id === nd.id).result) === JSON.stringify(d2.result) &&
+      JSON.stringify(S3.decisions.filter(d => d.seeded)) === JSON.stringify(sd), S3.decisions.map(d => d.result));
+    // 예전 저장 기록(시나리오용 없음) 이전: 불러올 때 시나리오용 2건을 넣고 기존 기록은 그대로
+    await p.evaluate(v => { const s = JSON.parse(v); s.decisions = s.decisions.filter(d => !d.seeded); localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); }, JSON.stringify(S3)); await p.reload(); await p.waitForTimeout(150); await closePrompt();
+    await ledGo(); R = await ledRows();
+    expect('예전 기록 이전: 시나리오용 2건 다시 들어감 · 기존 판단 그대로 · 학습 데이터 3건', R.length === 3 && R.filter(r => r.seeded && r.sc === '시나리오용').length === 2 && R.some(r => r.id === nd.id && r.res === wantK) && (await ledN()) === 3, R.map(r => r.txt));
+    // 5건 넘으면 5건만 보이고 나머지는 "더 보기"
+    await p.evaluate(() => { const s = JSON.parse(localStorage.getItem('flowpoint-test-v6')), d = s.decisions.find(x => !x.seeded); for (let i = 0; i < 3; i++) s.decisions.push(Object.assign({}, d, { id: 'more' + i, result: null })); localStorage.setItem('flowpoint-test-v6', JSON.stringify(s)); });
+    await p.reload(); await p.waitForTimeout(150); await closePrompt(); await ledGo();
+    const more = await p.evaluate(() => [document.querySelectorAll('#scLedger > .led-list > .led-rec').length, (document.querySelector('#scLedger details.led-more > summary') || {}).textContent, document.querySelectorAll('#scLedger details.led-more .led-rec').length, document.querySelector('#scLedger details.led-more').open]);
+    expect('6건 → 5건 보이고 1건은 "더 보기 (1건)" 아래(닫힘)', more[0] === 5 && more[1] === '더 보기 (1건)' && more[2] === 1 && !more[3], more);
+    await p.evaluate(v => localStorage.setItem('flowpoint-test-v6', v), snap0); await p.reload(); await p.waitForTimeout(150); await closePrompt(); }
 
   // 1. 수집함: 담당자가 확인(줄을 눌러 상세 → 수정: 오렌지유통 계산서 후보의 입금 예정일, 세진화학 발주의 납품 예정일·요구사항) → 대표가 모두 승인 → 매입·매출에 등록
   const ibAct = async (party, act) => { await p.locator('#ibList .ib-row', { hasText: party }).locator('.ib-open').click(); await p.waitForTimeout(150); await p.click(`#dlgBody [data-act="${act}"]`); await p.waitForTimeout(150); };
@@ -399,6 +703,14 @@ const SHOT = process.argv[3];
   await p.click('dialog [data-act="submitApply"]'); await p.waitForTimeout(150);
   s = await st(); console.log('app status after submit:', s.apps.map(a => a.status));
   expect('플로우페이 신청 → 거래 상대 확인 대기 (미발행 매출 연결)', s.apps.length === 1 && s.apps[0].status === 'confirm', s.apps.map(a => a.status));
+  // 근거 원장: 이 신청을 부족 해결에서 승인한 판단으로 기록(승인 → 신청 id 연결은 0-1b에서 화면으로 점검) → 결과는 상환 흐름에서 자동으로 붙음
+  await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('flowpoint-test-v6')), ap = S.apps[0], x = S.purchases.find(y => y.id === ap.refId);
+    S.decisions.push({ id: 'led-app', date: ap.date, sf: { start: x.due, need: 2320000 }, pick: { kind: 'fp', id: x.id, party: x.party, amt: Math.round(x.qty * x.price * 1.1), cost: ap.saleSupply - x.qty * x.price }, choice: 'approve', reason: '추천안', memo: '', by: 'ceo', result: null, appId: ap.id });
+    localStorage.setItem('flowpoint-test-v6', JSON.stringify(S)); });
+  await p.reload(); await p.waitForTimeout(150); await closePrompt();
+  const ledApp = async () => { await ledGo(); const r = (await ledRows()).find(x => x.id === 'led-app'), d = (await st()).decisions.find(x => x.id === 'led-app'); return { r, d, n: await ledN() }; };
+  { const L0 = await ledApp(); console.log('ledger approve(신청 중):', L0.r.txt, '| N', L0.n);
+    expect('승인 + 신청 → 근거 원장 "진행 중" · 신청 결과를 기다림 · 학습 데이터에 안 셈', L0.d.result === null && L0.r.res === 'wait' && L0.r.tag === '진행 중' && L0.r.txt.includes('결정 승인 플로우페이 대성원료 1,573만원 · 비용') && L0.r.txt.includes('신청 결과(완납·연체)가 나면 붙어요') && L0.n === 2, L0); }
   console.log('app price:', s.apps.map(a => `tier ${a.tier} rate ${a.rate} sale ${a.saleSupply}+${a.saleVat}=${a.saleTotal} pay ${a.payDate} mileage ${a.mileage} repay ${a.repayTotal} grace ${a.graceDays}`).join(''));
   console.log('app alloc:', s.apps[0].alloc.map(r => `${s.sales.find(x => x.id === r.saleId).party} ${r.due.slice(5)} ${r.saleTotal}→${r.forward}`).join(' / '), '| links', s.apps[0].links.length);
   { const a = s.apps[0];
@@ -547,6 +859,9 @@ const SHOT = process.argv[3];
   console.log('service progress done:', (await p.locator('#apps .fw').innerText()).replace(/\s+/g, ' '));
   const th = s.notifications.find(n => n.type === 'thanks');
   console.log('thanks:', th ? th.channel + ' · ' + th.to + ' · score ' + th.scoreBefore + '→' + th.scoreAfter + ' · limit ' + th.limBefore + '→' + th.limAfter : 'none');
+  { const L1 = await ledApp(), lg = s.scoreLog.find(l => l.target === '우리 회사' && l.why.startsWith('플로우페이 상환 완료')); console.log('ledger approve(완납):', JSON.stringify(L1.d.result), '|', L1.r.txt, '| N', L1.n);
+    expect('묶음 상환 완납 → 근거 원장 결과 "완납"(초록) · 점수 변화 = 점수 변동 기록(+25점) · 학습 데이터 3건', L1.d.result && L1.d.result.k === 'repaid' && L1.d.result.delta === lg.after - lg.before && L1.d.result.delta === 25 &&
+      L1.r.tag === '완납' && L1.r.tagCls.includes('ok') && L1.r.txt.includes('점수 +25점') && L1.n === 3, L1); }
   await role();
   console.log('reviewer after-care done:', await rvRow());
   await go('deals'); await p.click('#dlDetail [data-act="thanksOpen"]'); await p.waitForTimeout(150);
@@ -659,6 +974,8 @@ const SHOT = process.argv[3];
   s = await st(); console.log('[부록] +13일 (D+8):', await late(), '| toast', await p.textContent('#toast'), '| 대성 650', s.purchases.find(x => x.qty === 650).status + ' late ' + s.purchases.find(x => x.qty === 650).repayLate, '| score', s.scoreLog.slice(scLate).map(l => l.target + ' ' + l.before + '→' + l.after + ' (' + l.why + ')').join(' / '));
   expect('D+8 자동 연체: outcome late · 매입 연체일 기록 · 점수 −120', s.apps[0].outcome === 'late' && s.apps[0].outDate === isoAt(13) && s.purchases.find(x => x.qty === 650).repayLate === isoAt(13) &&
     s.scoreLog.slice(scLate).some(l => l.target === '우리 회사' && l.before - l.after === 120 && l.why.startsWith('플로우페이 연체')), s.scoreLog.slice(scLate));
+  { const L2 = await ledApp(); console.log('[부록] ledger approve(연체):', JSON.stringify(L2.d.result), '|', L2.r.txt);
+    expect('[부록] 넘김 기한 지나 자동 연체 → 근거 원장 결과 "연체"(빨강) · 점수 −120점', L2.d.result && L2.d.result.k === 'late' && L2.d.result.delta === -120 && L2.r.tag === '연체' && L2.r.tagCls.includes('bad') && L2.r.txt.includes('점수 −120점') && L2.n === 3, L2); }
   await go('sales'); console.log('[부록] late row:', (await p.locator('#saleRows li.tr-row', { hasText: '상환 매출' }).evaluateAll(ls => ls.map(l => l.innerText.replace(/\s+/g, ' ')))).join(' / '));
   await go('flowpay'); console.log('[부록] service progress late:', (await p.locator('#apps .fw').innerText()).replace(/\s+/g, ' '));
   await role(); console.log('[부록] reviewer:', await rvRow(), '| rvOut', await p.locator('#rvAfter li', { hasText: '대성원료' }).locator('[data-act="rvOut"]').count()); await role();
@@ -693,6 +1010,8 @@ const SHOT = process.argv[3];
   console.log('[부록] 연체 후 완납 한도 사용 중(상환 전 매입 합계):', usedLate, '→', await used());
   expect('연체 후 완납: outcome late 유지 · lateRepaid 기록 · 매입 상환 완료 · 거래 완료 · 한도 사용분 풀림', a0.outcome === 'late' && a0.lateRepaid === isoAt(73) && (a0.fwd || []).reduce((t, f) => t + f.amt, 0) === 15965090 &&
     s.purchases.find(x => x.qty === 650).status === 'repaid' && s.deals[0].status === 'done' && usedLate > 0 && (await used()) === 0, { outcome: a0.outcome, lateRepaid: a0.lateRepaid, deal: s.deals[0].status });
+  { const L3 = await ledApp(), lg = s.scoreLog.slice(scL).find(l => l.target === '우리 회사' && l.why.startsWith('플로우페이 연체 후 완납')); console.log('[부록] ledger approve(연체 후 완납):', JSON.stringify(L3.d.result), '|', L3.r.txt);
+    expect('[부록] 연체 뒤 다 넘김 → 근거 원장 결과 "연체 후 완납"(주황) · 점수 변화 = 점수 변동 기록', L3.d.result && L3.d.result.k === 'lateRepaid' && lg && L3.d.result.delta === lg.after - lg.before && L3.r.tag === '연체 후 완납' && L3.r.tagCls.includes('warn') && L3.n === 3, { L3, lg }); }
   expect('연체 후 완납 점수 기록과 감사 메일', s.scoreLog.slice(scL).some(l => l.target === '우리 회사' && l.why.startsWith('플로우페이 연체 후 완납') && l.after > l.before) && s.notifications.some(n => n.type === 'thanks' && n.text.includes('연체 후 완납')), s.scoreLog.slice(scL));
   await go('flowpay'); const spL = (await p.locator('#apps .fw').innerText()).replace(/\s+/g, ' ');
   console.log('[부록] service progress 연체 후 완납:', spL);

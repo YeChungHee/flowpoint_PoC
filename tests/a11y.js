@@ -8,11 +8,15 @@ const KEY = 'flowpoint-test-v6';
 // 'saledetail'은 #sales에서 연체 줄을 눌러 연 거래 상세 시트, 'newtrade'는 "+ 새 거래" 입력 시트
 // 'fwdsheet'는 집행 후 묶은 매출(한결푸드) 입금 확인 → "오늘 276에 넘길 금액" 시트. #sales는 입금 확인 후 "나중에"(줄에 넘기기), #flowpay는 1건 넘긴 진행률 상태
 // 'actsheet'는 심사 화면(포트폴리오 · 이슈 피드 · AI 검토 보고서)에서 이슈 하나의 '조치 기록' 시트를 연 상태
-// 'shortsheet'는 #home 오늘 할 일의 "부족 해결"로 연 부족 해결 비교 시트(플로우페이·먼저 받기 후보, 추천 1개)
+// 'shortsheet'는 #home 오늘 할 일의 "부족 해결"로 연 부족 해결 시트(단계 표시줄 · 이상 · 이유 폭포 · 영향 · 판단(추천 승인·보류))
+// 'shortsheet-hold'는 그 시트의 추천 줄 "보류"로 겹쳐 연 보류 사유 시트(기타 선택 · 메모 필수 상태)
 // 'report-ar'·'report-ap'는 #report(자금일보)에서 받을 돈 · 줄 돈 탭을 고른 상태 (해시는 #report 그대로)
+// 'reconsheet'는 자금일보 맨 위 "차이 330만원 · 확인 필요"로 연 미확인 입금 연결 시트(추천 · 다른 매출 라디오), 'report-linked'는 그 시트에서 연결한 뒤의 자금일보("합계 일치 ✓" · 평소 범위 타일)
+// 'score-ledger'는 #score(우리 회사)의 근거 원장에 결과 6가지(진행 중 · 완납 · 연체 · 연체 후 완납 · 부족 해소 · 부족 미해소)가 모두 있고 "더 보기"를 펼친 상태.
+// 'score'에는 시나리오용 2건, 'shortsheet'의 판단 구간에는 "지난 같은 상황" 표가 있어야 함(없으면 route 실패)
 // 'dealdetail'은 #deals에서 거래 하나를 연 상태(좁은 화면은 상세만), 'link'는 매입처 외부용 화면(#link/<token>, 1단계 발주서 열람)
-const HASHES = ['home', 'inbox', 'report', 'report-ar', 'report-ap', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet'];
-const SHEETS = ['prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet'];
+const HASHES = ['home', 'inbox', 'report', 'report-ar', 'report-ap', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet', 'report-linked', 'score-ledger'];
+const SHEETS = ['prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet'];
 const SIZES = { 1280: 800, 820: 1180, 390: 844 };
 
 // 알고 있는 예외 (실패로 세지 않고 이유와 함께 따로 보여 준다). key는 "점검|선택자" 앞부분과 비교
@@ -239,9 +243,19 @@ async function openHash(p, h){
     await p.evaluate(() => document.querySelector('#dlgBody [data-act="paid"]').click()); await p.waitForTimeout(150);
     return;
   }
-  if (h === 'shortsheet'){
+  if (h === 'shortsheet' || h === 'shortsheet-hold'){
     await p.evaluate(() => location.hash = 'home'); await p.waitForTimeout(150);
     await p.evaluate(() => document.querySelector('#sigBox [data-act="shortSheet"]').click()); await p.waitForTimeout(150);
+    if (h === 'shortsheet-hold'){
+      await p.evaluate(() => document.querySelector('#dlgBody [data-act="shortHold"]').click()); await p.waitForTimeout(150);
+      await p.evaluate(() => document.querySelector('#holdBody input[value="기타"]').click()); await p.waitForTimeout(80);
+    }
+    return;
+  }
+  if (h === 'reconsheet' || h === 'report-linked'){
+    await p.evaluate(() => location.hash = 'report'); await p.waitForTimeout(150);
+    await p.evaluate(() => document.getElementById('rpRecon').click()); await p.waitForTimeout(150);
+    if (h === 'report-linked'){ await p.evaluate(() => document.querySelector('#dlgFoot [data-act="reconLink"]').click()); await p.waitForTimeout(150); }
     return;
   }
   if (h === 'report-ar' || h === 'report-ap'){
@@ -283,6 +297,11 @@ async function openHash(p, h){
   if (h === 'actsheet'){
     await p.evaluate(() => location.hash = 'review'); await p.waitForTimeout(150);
     await p.evaluate(() => document.querySelector('#rvFeed [data-act="rvActOpen"]').click()); await p.waitForTimeout(150);
+    return;
+  }
+  if (h === 'score-ledger'){
+    await p.evaluate(() => location.hash = 'score'); await p.waitForTimeout(150);
+    await p.evaluate(() => { const d = document.querySelector('#scLedger details.led-more'); if (d) d.open = true; }); await p.waitForTimeout(80);
     return;
   }
   if (h === 'company'){
@@ -345,8 +364,13 @@ async function makeReviewState(b){
   const thanksSt = JSON.parse(await p.evaluate(k => localStorage.getItem(k), KEY)); thanksSt.role = 'ceo';
   if (thanksSt.apps[0].outcome !== 'repaid' || !thanksSt.notifications.some(n => n.type === 'thanks')) throw new Error('자동 상환 완료 상태를 만들지 못함');
   await ctx.close();
+  // 근거 원장: 자동 상환 완료된 신청에 연결한 승인(완납) + 진행 중 보류 + 연체 · 연체 후 완납(결과가 붙은 기록) → 시나리오용 2건과 합쳐 6건
+  const ledSt = JSON.parse(JSON.stringify(thanksSt)), hd = ledSt.decisions.find(d => d.seeded), t1 = ledSt.apps[0].date;
+  const mk = (id, o) => Object.assign(JSON.parse(JSON.stringify(hd)), { id, date: t1, seeded: undefined, sf: { start: t1, need: 2320000 } }, o);
+  ledSt.decisions.push(mk('a11y-app', { choice: 'approve', reason: '추천안', appId: ledSt.apps[0].id, result: null }), mk('a11y-wait', { reason: '기타', memo: '다음 주 투자금 입금 예정', by: 'staff', result: null, sf: { start: '2999-01-01', need: 2320000 } }),
+    mk('a11y-late', { choice: 'approve', reason: '추천안', appId: 'none', result: { k: 'late', date: t1, note: '예시 신청', delta: -120 } }), mk('a11y-lr', { choice: 'approve', reason: '추천안', appId: 'none', result: { k: 'lateRepaid', date: t1, note: '예시 신청', delta: 25 } }));
   st.role = 'reviewer';
-  return { review: JSON.stringify(st), link: signSt, deals: JSON.stringify(ready), dealdetail: JSON.stringify(ready), docprev: JSON.stringify(ready), delivery: JSON.stringify(ready),
+  return { 'score-ledger': JSON.stringify(ledSt), review: JSON.stringify(st), link: signSt, deals: JSON.stringify(ready), dealdetail: JSON.stringify(ready), docprev: JSON.stringify(ready), delivery: JSON.stringify(ready),
     actsheet: JSON.stringify(st), calendar: JSON.stringify(ready), notif: JSON.stringify(thanksSt), thanks: JSON.stringify(thanksSt),
     fwdsheet: JSON.stringify(ready), sales: later, flowpay: fwd1 };
 }
@@ -371,8 +395,13 @@ async function auditPass(b, opt, reviewState, label){
     await openHash(p, h);
     const ctxName = label + ' #' + h;
     const now = await p.evaluate(() => location.hash);
-    if (h !== 'company' && h !== 'link' && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h.replace(/-a[rp]$/, '')) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
+    if (h !== 'company' && h !== 'link' && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h.replace(/-(a[rp]|linked|ledger)$/, '')) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
     if (SHEETS.includes(h) && !(await p.evaluate(() => document.getElementById('dlg').open))) fail('route', h, '시트가 열리지 않음', ctxName);
+    // 근거 원장 · 지난 같은 상황이 점검 대상에 실제로 들어 있는지
+    const led = await p.evaluate(() => [document.querySelectorAll('#scLedger .led-rec').length, [...new Set([...document.querySelectorAll('#scLedger .led-rec')].map(l => l.dataset.res))].sort().join(), document.querySelectorAll('#sfPast tbody tr').length]);
+    if (h === 'score' && led[0] < 2) fail('route', h, '근거 원장 기록이 없음 (' + led + ')', ctxName);
+    if (h === 'score-ledger' && (led[0] !== 6 || led[1] !== 'late,lateRepaid,repaid,resolved,unresolved,wait')) fail('route', h, '근거 원장 결과 6가지가 아님 (' + led + ')', ctxName);
+    if (h === 'shortsheet' && led[2] < 2) fail('route', h, '지난 같은 상황 표가 없음 (' + led + ')', ctxName);
     const r = await p.evaluate(AUDIT);
     count('contrast', r.n.contrast); count('target', r.n.target); count('overflow', 1); count('charts', r.n.charts);
     r.contrast.forEach(x => fail('contrast', x.key, x.msg, ctxName));
@@ -515,25 +544,62 @@ async function keyboardPass(b, reviewState){
     if (!fo[0] || fo[1] !== 'true' || fo[2] !== 0) fail('keys', 'fold-enter', '"완료 N건" 펼침이 Enter로 열리지 않거나 포커스를 잃음 (' + fo + ')', C);
     await ctx.close();
   }
-  // (2-2) 부족 해결 시트: 홈 오늘 할 일의 "부족 해결"에서 Enter → 시트(추천 버튼에 포커스), Esc → 닫히고 연 버튼으로 포커스.
-  //       자금일보 알림의 "부족 해결"도 같은 방식. 추천 버튼 Enter → 신청 시트(단계 제목에 포커스), Esc → 처음 연 버튼으로
+  // (2-2) 부족 해결 시트: 홈 오늘 할 일의 "부족 해결"에서 Enter → 시트(맨 위 "이상" 금액에 포커스), Esc → 닫히고 연 버튼으로 포커스.
+  //       자금일보 알림의 "부족 해결"도 같은 방식. 추천 "승인" Enter → 신청 시트(단계 제목에 포커스), Esc → 처음 연 버튼으로
   {
     const { ctx, p } = await newPage(b, { w: 1280, h: 800 });
     count('keys', 3);
     for (const [h, sel] of [['home', '#sigBox [data-act="shortSheet"]'], ['report', '#sfCallout [data-act="shortSheet"]']]){
       await p.evaluate(x => location.hash = x, h); await p.waitForTimeout(150);
       await p.focus(sel); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
-      const foc = await p.evaluate(() => document.getElementById('dlg').open && document.getElementById('dlgTitle').textContent === '부족 해결' && document.activeElement.dataset.act);
+      const foc = await p.evaluate(() => document.getElementById('dlg').open && document.getElementById('dlgTitle').textContent === '부족 해결' && document.activeElement.id);
       await p.keyboard.press('Escape'); await p.waitForTimeout(150);
       const back = await p.evaluate(s => !document.getElementById('dlg').open && document.activeElement === document.querySelector(s), sel);
-      if (foc !== 'shortGo' || !back) fail('keys', 'short-esc-' + h, '부족 해결 시트 포커스(' + foc + ')·Esc 후 연 버튼 포커스(' + back + ')가 맞지 않음', C + ' #' + h);
+      if (foc !== 'sfBig' || !back) fail('keys', 'short-esc-' + h, '부족 해결 시트 포커스(' + foc + ')·Esc 후 연 버튼 포커스(' + back + ')가 맞지 않음', C + ' #' + h);
     }
     await p.focus('#sfCallout [data-act="shortSheet"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
-    await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    await p.focus('#dlgBody [data-act="shortGo"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
     const ap = await p.evaluate(() => document.getElementById('dlg').open && !!document.querySelector('#dlg .stepbar') && document.activeElement.classList.contains('step-t'));
     await p.keyboard.press('Escape'); await p.waitForTimeout(150);
     const back2 = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.dataset.act);
-    if (!ap || back2 !== 'shortSheet') fail('keys', 'short-go', '추천 버튼 Enter로 신청 시트가 열리고(단계 제목 포커스) Esc 후 연 버튼으로 돌아오지 않음 (' + ap + ', ' + back2 + ')', C);
+    if (!ap || back2 !== 'shortSheet') fail('keys', 'short-go', '추천 "승인" Enter로 신청 시트가 열리고(단계 제목 포커스) Esc 후 연 버튼으로 돌아오지 않음 (' + ap + ', ' + back2 + ')', C);
+    await ctx.close();
+  }
+  // (2-2b) 부족 해결 단계 표시줄(390): nav 이름 · 버튼 4개(이상·이유·영향·판단) · Tab으로 차례로 이동 · Enter로 그 구간 제목에 포커스 + 지금 단계(aria-current) · 구간이 표시줄 아래에 보임
+  //        보류 사유 시트: 사유 라디오 그룹(이름) · 고르기 전 "보류 기록" 비활성 · 기타는 메모 필수 · Esc는 사유 시트부터, 다음 Esc는 부족 해결 시트
+  {
+    const C3 = '키보드 390 라이트';
+    const { ctx, p } = await newPage(b, { w: 390, h: 844 });
+    await p.evaluate(() => location.hash = 'home'); await p.waitForTimeout(150);
+    await p.focus('#sigBox [data-act="shortSheet"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    count('keys', 6);
+    const nav = await p.evaluate(() => { const n = document.getElementById('sfSteps'); return n && n.tagName === 'NAV' && n.getAttribute('aria-label') && [...n.querySelectorAll('button')].map(b => b.textContent.trim()).join(','); });
+    if (nav !== '1 이상,2 이유,3 영향,4 판단') fail('keys', 'sf-steps-nav', '단계 표시줄이 이름 있는 nav + 버튼 4개(이상·이유·영향·판단)가 아님 (' + nav + ')', C3);
+    // 시트 맨 위 포커스(sfBig)에서 Shift+Tab이 아니라 표시줄 첫 버튼부터: 표시줄 버튼에 직접 포커스한 뒤 Tab으로 다음 단계 버튼
+    await p.focus('#sfSteps button >> nth=0'); await p.keyboard.press('Tab');
+    const tab1 = await p.evaluate(() => document.activeElement.dataset.to);
+    if (tab1 !== 'sfH2') fail('keys', 'sf-steps-tab', '단계 표시줄에서 Tab이 다음 단계 버튼(이유)으로 가지 않음 (' + tab1 + ')', C3);
+    for (const [i, to] of [[1, 'sfH2'], [2, 'sfH3'], [3, 'sfH4'], [0, 'sfBig']]){
+      await p.focus('#sfSteps button >> nth=' + i); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+      const r = await p.evaluate(() => { const nav = document.getElementById('sfSteps').getBoundingClientRect(), a = document.activeElement, ar = a.getBoundingClientRect(), body = document.getElementById('dlgBody').getBoundingClientRect();
+        return [a.id, document.querySelector('#sfSteps [aria-current="step"]').dataset.to, ar.top >= nav.bottom - 1 && ar.bottom <= body.bottom + 1]; });
+      if (r[0] !== to || r[1] !== to || !r[2]) fail('keys', 'sf-step-' + to, '단계 버튼 Enter 후 포커스(' + r[0] + ')·지금 단계(' + r[1] + ')·보임(' + r[2] + ')이 ' + to + '와 맞지 않음', C3);
+    }
+    // 보류 사유 시트
+    await p.focus('#dlgBody [data-act="shortHold"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const h0 = await p.evaluate(() => { const d = document.getElementById('holdDlg'), f = d.querySelector('fieldset'); return [d.open, document.activeElement.name, !!f && document.getElementById(f.getAttribute('aria-labelledby')).textContent, document.getElementById('holdOk').disabled, d.getAttribute('aria-labelledby') && document.getElementById(d.getAttribute('aria-labelledby')).textContent, !!document.querySelector('label[for="holdMemo"]')]; });
+    if (!h0[0] || h0[1] !== 'holdR' || h0[2] !== '보류 사유' || !h0[3] || h0[4] !== '보류 사유' || !h0[5]) fail('keys', 'hold-open', '보류 사유 시트: 열림·첫 사유 포커스·라디오 그룹 이름·처음 비활성·제목·메모 이름 중 맞지 않음 (' + h0 + ')', C3);
+    // 화살표로 사유 이동(라디오 그룹) → 기타까지 → 메모 없이는 비활성
+    for (let i = 0; i < 3; i++){ await p.keyboard.press('ArrowDown'); await p.waitForTimeout(40); }
+    const h1 = await p.evaluate(() => [document.activeElement.value, document.getElementById('holdOk').disabled]);
+    await p.keyboard.press('Tab'); await p.keyboard.type('메모'); await p.waitForTimeout(60);
+    const h2 = await p.evaluate(() => [document.activeElement.id, document.getElementById('holdOk').disabled]);
+    if (h1[0] !== '기타' || !h1[1] || h2[0] !== 'holdMemo' || h2[1]) fail('keys', 'hold-other', '화살표로 기타 선택 시 비활성 · Tab으로 메모 입력 후 활성이 아님 (' + h1 + ' / ' + h2 + ')', C3);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const e1 = await p.evaluate(() => [document.getElementById('holdDlg').open, document.getElementById('dlg').open, document.activeElement.dataset.act]);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const e2 = await p.evaluate(() => [document.getElementById('dlg').open, document.activeElement.dataset.act]);
+    if (e1[0] || !e1[1] || e1[2] !== 'shortHold' || e2[0] || e2[1] !== 'shortSheet') fail('keys', 'hold-esc', 'Esc 순서: 사유 시트 닫힘·보류 버튼 포커스(' + e1 + ') → 부족 해결 시트 닫힘·연 버튼 포커스(' + e2 + ')가 아님', C3);
     await ctx.close();
   }
   // (2-3) 자금일보 탭: 고른 탭만 Tab 순서(tabindex 0) · 오른쪽/왼쪽 화살표 · End로 탭과 패널이 바뀌고 포커스가 따라감
@@ -550,6 +616,30 @@ async function keyboardPass(b, reviewState){
       const got = await now();
       if (got !== want) fail('keys', 'rp-tab-' + k + '-' + want.split('|')[0], '자금일보 탭에서 ' + k + ' 후 ' + got + ' (기대 ' + want + ')', C + ' #report');
     }
+    await ctx.close();
+  }
+  // (2-4) 미확인 입금 연결 시트(390): 합계 알약 Enter → 시트(추천 라디오에 포커스, 후보 묶음 이름) · 화살표로 후보 이동 · Esc → 알약으로 포커스
+  //       다시 열어 추천으로 돌아와 "연결" Enter → 시트 닫히고 알약("합계 일치 ✓")에 포커스. 평소 범위 타일은 이름 있는 묶음(role=group, 숫자 포함)
+  {
+    const C4 = '키보드 390 라이트';
+    const { ctx, p } = await newPage(b, { w: 390, h: 844 });
+    await p.evaluate(() => location.hash = 'report'); await p.waitForTimeout(150);
+    count('keys', 4);
+    const tl = await p.evaluate(() => [...document.querySelectorAll('#rpTiles .rp-tile')].map(t => t.getAttribute('role') === 'group' && /\d/.test(t.getAttribute('aria-label') || '')));
+    if (tl.length !== 6 || !tl.every(Boolean)) fail('keys', 'rp-tiles-name', '평소 범위 타일 6개가 이름(숫자 포함) 있는 묶음이 아님 (' + tl + ')', C4 + ' #report');
+    await p.focus('#rpRecon'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const o = await p.evaluate(() => { const a = document.activeElement, f = a.closest('fieldset'); return [document.getElementById('dlg').open, a.name, a.checked, a.closest('#rcRec') ? 'rec' : '', f && document.getElementById(f.getAttribute('aria-labelledby')).textContent, document.getElementById('rpRecon').getAttribute('aria-haspopup')]; });
+    if (!o[0] || o[1] !== 'rcPick' || !o[2] || o[3] !== 'rec' || !/^연결할 매출 · 금액 같은 \d+건$/.test(o[4] || '') || o[5] !== 'dialog') fail('keys', 'recon-open', '합계 알약 Enter로 연결 시트가 열려 추천 후보(이름 있는 묶음)에 포커스가 가지 않음 (' + o + ')', C4);
+    await p.keyboard.press('ArrowDown'); await p.waitForTimeout(60);
+    const mv = await p.evaluate(() => [document.activeElement.checked, !!document.activeElement.closest('#rcOther')]);
+    if (!mv[0] || !mv[1]) fail('keys', 'recon-arrow', '화살표로 다른 매출 후보로 옮겨 고르지 못함 (' + mv + ')', C4);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const e1 = await p.evaluate(() => [document.getElementById('dlg').open, document.activeElement.id]);
+    if (e1[0] || e1[1] !== 'rpRecon') fail('keys', 'recon-esc', 'Esc 후 연결 시트가 닫히고 합계 알약으로 포커스가 돌아오지 않음 (' + e1 + ')', C4);
+    await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    await p.focus('#dlgFoot [data-act="reconLink"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const e2 = await p.evaluate(() => [document.getElementById('dlg').open, document.activeElement.id, document.getElementById('rpRecon').textContent.trim()]);
+    if (e2[0] || e2[1] !== 'rpRecon' || e2[2] !== '합계 일치 ✓') fail('keys', 'recon-link', '"연결" Enter 후 시트가 닫히고 "합계 일치 ✓" 알약에 포커스가 아님 (' + e2 + ')', C4);
     await ctx.close();
   }
   // (3) 휴대폰: 거래 세그먼트 화살표, 더보기 시트 Esc
