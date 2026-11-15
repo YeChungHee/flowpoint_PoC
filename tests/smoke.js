@@ -1,9 +1,10 @@
 const { chromium } = require('playwright');
+const NET_ERR = /^(Failed to load resource|Failed to decode downloaded font|OTS parsing error|Access to font at)/;  // 글꼴·네트워크 요청 실패는 페이지 오류가 아님 (pageerror·스크립트 오류만 셈)
 (async () => {
   const file = 'file://' + process.argv[2];
   const b = await chromium.launch(); const p = await b.newPage();
-  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type()==='error') errs.push(m.text()); });
-  await p.goto(file); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type()==='error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
+  await p.goto(file + '#home'); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);
   // 접속 시 승인 창(시나리오 수집 후보 2건): 제목 확인 후 '나중에'로 닫는다
   console.log('prompt   ', await p.evaluate(() => document.getElementById('dlg').open ? document.getElementById('dlgTitle').textContent : '(없음)'));
   if (await p.evaluate(() => document.getElementById('dlg').open)) await p.click('#dlgLeft [data-act="close"]');
@@ -41,7 +42,7 @@ const { chromium } = require('playwright');
   await p.evaluate(() => { const k = 'flowpoint-test-v6', s = JSON.parse(localStorage.getItem(k)); s.role = 'reviewer'; localStorage.setItem(k, JSON.stringify(s)); });
   await p.reload(); await p.waitForTimeout(150);
   await p.evaluate(() => location.hash = 'review'); await p.waitForTimeout(150);
-  console.log('review   ', await p.evaluate(() => [location.hash, document.querySelectorAll('.pf-tbl tbody tr').length + ' 고객사 (예시 ' + document.querySelectorAll('.pf-tbl tr.pf-ex').length + ')', document.querySelectorAll('#rvFeed .rv-feed li:not(.empty)').length + ' 이슈', document.querySelectorAll('#rvQueue .ai-rep').length + ' AI 보고서'].join(' | ')));
+  console.log('review   ', await p.evaluate(() => [location.hash, document.querySelectorAll('.pf-tbl tbody tr').length + ' 고객사 (예시 ' + document.querySelectorAll('.pf-tbl tr.pf-ex').length + ')', document.querySelectorAll('#rvFeed .rv-feed li:not(.empty)').length + ' 이슈', '숫자 ' + [...document.querySelectorAll('#rvKpis .rv-kv')].map(x => x.textContent).join('·'), (document.querySelector('#rvQueue .rv-empty-t') || { textContent: document.querySelectorAll('#rvQueue tbody tr').length + '줄' }).textContent].join(' | ')));
   await p.evaluate(() => document.querySelector('#rvFeed [data-act="rvActOpen"]').click()); await p.waitForTimeout(150);
   console.log('actsheet ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + document.querySelectorAll('dialog .reasons input').length + ' 유형 | 메모 ' + !!document.getElementById('iaMemo')));
   // 매입·매출 목록: 줄마다 지금 할 일 버튼 0~1개, 줄을 누르면 상세 시트, "+ 새 거래" 시트에서 입력

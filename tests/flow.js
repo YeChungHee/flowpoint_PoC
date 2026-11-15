@@ -6,10 +6,15 @@
 // 숫자·상태 확인은 expect()로 점검하고, 하나라도 틀리거나 페이지 오류가 있으면 종료 코드 1
 const { chromium } = require('playwright');
 const SHOT = process.argv[3];
+const NET_ERR = /^(Failed to load resource|Failed to decode downloaded font|OTS parsing error|Access to font at)/;  // 글꼴·네트워크 요청 실패는 페이지 오류가 아님 (pageerror·스크립트 오류만 셈)
+// BLOCK_FONTS=1: 글꼴 배포처(jsDelivr) 요청을 모두 막고 실행 → 인터넷 없이도 대체 글꼴(맑은 고딕·애플 고딕·시스템 글꼴)로 화면·점검이 그대로인지 확인
+const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
 (async () => {
-  const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 }); const p = await ctx.newPage();
-  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type()==='error') errs.push(m.text()); });
-  await p.goto('file://' + process.argv[2]); await p.evaluate(() => localStorage.clear()); await p.reload();
+  const b = await chromium.launch();
+  const newCtx = async o => { const c = await b.newContext(o); if (BLOCK_FONTS) await c.route(/cdn\.jsdelivr\.net/, r => r.abort()); return c; };
+  const ctx = await newCtx({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 }); const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type()==='error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
+  await p.goto('file://' + process.argv[2] + '#home'); await p.evaluate(() => localStorage.clear()); await p.reload();
   const go = async h => { await p.evaluate(x => location.hash = x, h); await p.waitForTimeout(120); };
   // 캡처 전에 해당 부분을 화면 안으로 스크롤 (전체 페이지 캡처는 쓰지 않음)
   const into = async (sel, gap = 72) => { await p.locator(sel).first().evaluate(e => e.scrollIntoView({ block: 'start' })); await p.evaluate(g => window.scrollBy(0, -g), gap); await p.waitForTimeout(120); };
@@ -86,6 +91,120 @@ const SHOT = process.argv[3];
     if (log) { console.log('photo:', Math.round(png.length * 0.75 / 1024) + 'KB →', thumb.w + '×' + thumb.h, thumb.kb + 'KB dataURL | submit:', await p.textContent('#dlgFoot [data-act="dlvSubmit"]')); await shot('11-delivery'); }
     await p.click('#dlgFoot [data-act="dlvSubmit"]'); await p.waitForTimeout(150);
   };
+
+  // 00. 첫 화면(고객 소개 페이지): 새 기록 + 주소에 화면 표시 없음 → #intro. 숫자는 앱과 같음, 무료로 시작하기 → 앱 홈, 다시 열어도 앱
+  for (const W of [1280, 390]) {
+    const c0 = await newCtx({ viewport: { width: W, height: W === 390 ? 844 : 900 }, deviceScaleFactor: W === 1280 ? 2 : 1 }), q = await c0.newPage();
+    q.on('pageerror', e => errs.push(e.message)); q.on('console', m => { if (m.type() === 'error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
+    const qgo = async h => { await q.evaluate(x => location.hash = x, h); await q.waitForTimeout(120); };
+    // 캡처(1280만): 안내서 0장 소개 페이지 · 심사역 소개 · 심사 대기 빈 상태
+    const qshot = async n => { if (!SHOT || W !== 1280) return; await q.mouse.move(0, 899); await q.evaluate(() => { const t = document.getElementById('toast'); if (t) t.classList.remove('show'); }); await q.waitForTimeout(250); await q.screenshot({ path: SHOT + '/' + n + '.png', fullPage: false }); };
+    const qClose = async () => { if (await q.evaluate(() => document.getElementById('dlg').open)) { await q.click('#dlgLeft [data-act="close"]'); await q.waitForTimeout(100); } };
+    const S0 = () => q.evaluate(() => JSON.parse(localStorage.getItem('flowpoint-test-v6')));
+    await q.goto('file://' + process.argv[2]); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(200);
+    const i0 = await q.evaluate(() => ({ view: document.querySelector('.view.on').id, hash: location.hash, side: getComputedStyle(document.getElementById('side')).display, tab: getComputedStyle(document.getElementById('tabbar')).display,
+      foot: getComputedStyle(document.querySelector('body > footer')).display, h1: [...document.querySelectorAll('.view.on h1')].map(h => h.textContent.replace(/\s+/g, ' ').trim()), nh1: document.querySelectorAll('.view.on h1').length,
+      h2: [...document.querySelectorAll('#v-intro h2')].map(h => h.textContent.replace(/\s+/g, ' ').trim()), prompt: document.getElementById('dlg').open, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
+      note: document.querySelector('#v-intro .it-foot').textContent.includes('테스트 페이지') }));
+    console.log('intro ' + W + ':', JSON.stringify(i0));
+    expect('첫 화면 ' + W + ': 새 기록 · 해시 없음 → #intro, 사이드바·탭 바·테스트 막대 없음, 승인 창 없음', i0.view === 'v-intro' && i0.hash === '' && i0.side === 'none' && i0.tab === 'none' && i0.foot === 'none' && !i0.prompt && i0.note, i0);
+    expect('첫 화면 ' + W + ': h1 1개 "매입과 매출이 자금이 되는 곳." + 구역마다 h2', i0.nh1 === 1 && i0.h1[0] === '매입과 매출이 자금이 되는 곳.' && i0.h2.length === 5, i0);
+    expect('첫 화면 ' + W + ': 가로 스크롤 없음', i0.sw <= i0.cw, i0);
+    // 로고 = 시안 14a 별자리 마크(64×64 · 선 46 · 점 37 · 가운데 점 브랜드 파랑) + "Flowpoint" 글자, 탭 아이콘도 같은 마크
+    const lg0 = await q.evaluate(() => { const m = document.querySelector('#v-intro .it-brand .mark.logo'), svg = m.querySelector('svg'), fav = document.querySelector('link[rel="icon"]').getAttribute('href');
+      return { vb: svg.getAttribute('viewBox'), lines: svg.querySelectorAll('line').length, dots: svg.querySelectorAll('circle').length, blue: svg.querySelectorAll('circle[fill="#2D54D6"]').length, word: m.querySelector('.lg-word').textContent, label: m.getAttribute('aria-label'),
+        favVb: decodeURIComponent(fav).includes('viewBox="0 0 64 64"'), favDots: (decodeURIComponent(fav).match(/<circle/g) || []).length }; });
+    console.log('logo ' + W + ':', JSON.stringify(lg0));
+    expect('로고 ' + W + ' = 14a 별자리 마크 (viewBox 0 0 64 64 · 선 46 · 점 37 · "Flowpoint") · 탭 아이콘도 14a', lg0.vb === '0 0 64 64' && lg0.lines === 46 && lg0.dots === 37 && lg0.blue >= 1 && lg0.word === 'Flowpoint' && lg0.label === 'Flowpoint 플로우포인트' && lg0.favVb && lg0.favDots === 37, lg0);
+    // 글꼴: Pretendard(jsDelivr) → 받지 못하면 대체 글꼴. 글꼴을 막은 실행에서는 Pretendard 0개 · 글꼴 순서는 그대로 · 화면은 같은 점검을 통과
+    const ft = await q.evaluate(async () => { await document.fonts.ready; const pf = [...document.fonts].filter(f => /Pretendard/.test(f.family));
+      return { faces: pf.length, loaded: pf.filter(f => f.status === 'loaded').length,
+        body: getComputedStyle(document.body).fontFamily, h1w: Math.round(document.querySelector('#v-intro h1').getBoundingClientRect().width) }; });
+    console.log('font ' + W + (BLOCK_FONTS ? ' (글꼴 막음)' : '') + ':', JSON.stringify(ft));
+    expect('글꼴 순서 ' + W + ': Pretendard Variable → 맑은 고딕 → 애플 고딕 → 시스템', /^"Pretendard Variable", Pretendard, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", system-ui, sans-serif$/.test(ft.body) && ft.h1w > 100, ft);
+    if (BLOCK_FONTS) expect('글꼴 막음 ' + W + ': Pretendard 못 받음(글꼴 0개) → 대체 글꼴로 표시 · 제목 보임', ft.faces === 0 && ft.loaded === 0 && ft.h1w > 100, ft);
+    if (W === 1280) { await q.evaluate(() => window.scrollTo(0, 0)); await qshot('00-intro-top');
+      await q.locator('#v-intro .it-score').evaluate(e => e.scrollIntoView({ block: 'start' })); await q.waitForTimeout(150); await qshot('00a-intro-score'); await q.evaluate(() => window.scrollTo(0, 0)); }
+    const iv = await q.evaluate(() => ['itBal', 'itIn7', 'itScore', 'itScoreBig', 'itFp', 'itAr'].map(id => document.getElementById(id).textContent.trim()));
+    const nRows = await q.locator('#itRows li').count();
+    await q.click('#v-intro .it-acts [data-act="itConsult"]'); await q.waitForTimeout(80);
+    const cTxt = await q.textContent('#toast');
+    // 앱 숫자: 홈(잔고 · 플로우페이 가능 · 먼저 받기 가능) · 서비스 진행(점수) · 자금일보(7일 들어올 돈)
+    await qgo('home'); await qClose();
+    const hv = await q.evaluate(() => [document.querySelector('#hmCards .hm-bal .hm-val').textContent.trim(), document.getElementById('hmFp').textContent.trim(), document.getElementById('hmAr').textContent.trim()]);
+    await qgo('flowpay'); const sc = (await q.textContent('#score')).trim();
+    await qgo('report'); const in7 = await q.evaluate(() => [...document.querySelectorAll('#rpCards .rp-card')].find(c => c.textContent.includes('7일 들어올 돈')).querySelector('.rp-val').textContent.trim());
+    console.log('intro numbers:', iv.join(' / '), '| app', [hv[0], in7, sc, hv[1], hv[2]].join(' / '), '| rows', nRows, '| 상담', cTxt);
+    expect('소개 숫자 = 앱 숫자 ' + W + ' (잔고 · 7일 들어올 돈 · 점수 · 플로우페이 가능 · 먼저 받기 가능)', iv[0] === hv[0] && iv[1] === in7 && iv[2] === sc && iv[3] === sc && iv[4] === hv[1] && iv[5] === hv[2] && nRows >= 2 && nRows <= 3, { iv, hv, sc, in7, nRows });
+    expect('도입 상담 신청 → 테스트 안내', cTxt === '테스트 페이지 · 상담 신청 연동 예정', cTxt);
+    // 다른 화면을 보고 와도 아직 들어가지 않음 → 해시 없이 다시 열면 소개 페이지. 무료로 시작하기 → #home, entered 저장, 다시 열면 앱 홈
+    await q.goto('file://' + process.argv[2]); await q.waitForTimeout(200);
+    const back0 = await q.evaluate(() => document.querySelector('.view.on').id);
+    await q.click('#v-intro .it-nav [data-act="itStart"]'); await q.waitForTimeout(200);
+    const st1 = await q.evaluate(() => [location.hash, document.querySelector('.view.on').id, getComputedStyle(document.getElementById(innerWidth < 768 ? 'tabbar' : 'side')).display]), ent = (await S0()).entered;
+    await qClose();
+    await q.goto('file://' + process.argv[2]); await q.waitForTimeout(200);
+    const re = await q.evaluate(() => [location.hash, document.querySelector('.view.on').id]); await qClose();
+    console.log('start:', back0, '→', st1.join(' '), '| entered', ent, '| reload', re.join(' '));
+    expect('무료로 시작하기 ' + W + ' → #home(앱 탐색 보임), 다시 열어도 앱 홈', back0 === 'v-intro' && st1[0] === '#home' && st1[1] === 'v-home' && st1[2] !== 'none' && ent === true && re[1] === 'v-home', { back0, st1, ent, re });
+    // 소개 페이지로 돌아가기: 넓은 화면은 사이드바 로고, 휴대폰은 더보기의 "소개 페이지"
+    if (W === 1280) await q.click('#side .side-brand a.mark');
+    else { await q.click('#moreBtn'); await q.waitForTimeout(120); await q.click('#moreDlg a[href="#intro"]'); }
+    await q.waitForTimeout(200);
+    const lg = await q.evaluate(() => [location.hash, document.querySelector('.view.on').id, getComputedStyle(document.getElementById('side')).display, document.getElementById('moreDlg').open]);
+    expect((W === 1280 ? '사이드바 로고' : '더보기 소개 페이지') + ' → #intro', lg[0] === '#intro' && lg[1] === 'v-intro' && lg[2] === 'none' && !lg[3], lg);
+    // 심사역 메뉴 → #intro-review(심사역 소개, 시안 1b): h1 "판단은 사람이. 근거는 거래가." · 앱 탐색 없음 · 승인 창 없음 · 가로 스크롤 없음
+    await q.click('#v-intro .it-menu a[href="#intro-review"]'); await q.waitForTimeout(150);
+    const rvw = await q.evaluate(() => ({ hash: location.hash, view: document.querySelector('.view.on').id, h1: [...document.querySelectorAll('.view.on h1')].map(h => h.textContent.replace(/\s+/g, ' ').trim()),
+      h2: [...document.querySelectorAll('#v-intro-review h2')].map(h => h.textContent.trim()), side: getComputedStyle(document.getElementById('side')).display, tab: getComputedStyle(document.getElementById('tabbar')).display,
+      foot: getComputedStyle(document.querySelector('body > footer')).display, prompt: document.getElementById('dlg').open, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
+      fill: [...document.querySelectorAll('#v-intro-review button.primary')].map(x => x.textContent.trim()) }));
+    console.log('intro-review ' + W + ':', JSON.stringify(rvw));
+    expect('심사역 메뉴 ' + W + ' → #intro-review, h1 1개 "판단은 사람이. 근거는 거래가." + h2 4개, 앱 탐색·승인 창 없음', rvw.hash === '#intro-review' && rvw.view === 'v-intro-review' && rvw.h1.length === 1 && rvw.h1[0] === '판단은 사람이. 근거는 거래가.' &&
+      rvw.h2.length === 4 && rvw.side === 'none' && rvw.tab === 'none' && rvw.foot === 'none' && !rvw.prompt, rvw);
+    expect('심사역 소개 ' + W + ': 채움 버튼 1개 "관리자 로그인 (테스트)" · 가로 스크롤 없음', rvw.fill.length === 1 && rvw.fill[0] === '관리자 로그인 (테스트)' && rvw.sw <= rvw.cw, rvw);
+    // 미리보기 카드: 심사 대기 0건(새 기록) → 심사 화면의 고객사 포트폴리오 줄(이름 · 상태 · 사용 중 · 점수)과 같음
+    const irRows = () => q.evaluate(() => ({ h: document.getElementById('irQH').textContent, meta: document.getElementById('irQMeta').textContent,
+      head: [...document.querySelectorAll('#irQHead th')].map(t => t.textContent), rows: [...document.querySelectorAll('#irQRows tr')].map(r => [...r.cells].map(c => c.childNodes[0].textContent.trim()).join(' / ')) }));
+    const ir0 = await irRows();
+    await q.evaluate(() => window.scrollTo(0, 0)); await qshot('00b-intro-review');
+    // 관리자 로그인 (테스트) → 심사역 역할 · entered 저장 · #review(심사 대기)
+    await q.click('#v-intro-review [data-act="irLogin"]'); await q.waitForTimeout(250);
+    await q.evaluate(() => window.scrollTo(0, 0)); await qshot('00c-review-empty');
+    const lgn = await q.evaluate(() => [location.hash, document.querySelector('.view.on').id, document.body.classList.contains('lp'), document.getElementById('roleName').textContent, document.getElementById('dlg').open]), lgS = await S0();
+    const rv0 = await q.evaluate(() => ({ title: document.getElementById('rvTitle').textContent, empty: (document.querySelector('#rvQueue .rv-empty-t') || {}).textContent, pf: [...document.querySelectorAll('.pf-tbl tbody tr')].map(r => [r.cells[0].querySelector('button').textContent, r.cells[6].textContent, r.cells[3].textContent, r.cells[1].querySelector('b').textContent].join(' / ')) }));
+    console.log('intro-review preview:', JSON.stringify(ir0), '| #review', JSON.stringify(rv0), '| login', lgn.join(' '), lgS.role, lgS.entered);
+    expect('심사역 소개 미리보기 ' + W + ' = 심사 화면 (심사 대기 0건 → 고객사 포트폴리오 줄 그대로)', ir0.h === '고객사 포트폴리오' && ir0.meta === '심사 대기 0건' && rv0.title === '심사 대기' && rv0.empty === '심사 대기 0건' && ir0.head.join() === '고객사,상태,서비스 이용,스코어' &&
+      ir0.rows.length === rv0.pf.length && ir0.rows.join('|') === rv0.pf.join('|'), { ir0, rv0 });
+    // 심사 대기 화면(시안 1c) 빈 상태: 새 시나리오는 대기 0건 → "심사 대기 0건" + 도움말 한 줄 + 포트폴리오 링크(누르면 포트폴리오 제목으로 포커스), 목록 표 없음(가짜 신청 없음)
+    const e0 = await q.evaluate(() => ({ t: document.querySelector('#rvQueue .rv-empty-t').textContent, s: document.querySelector('#rvQueue .rv-empty-s').textContent, tbl: document.querySelectorAll('#rvQueue table').length,
+      apps: JSON.parse(localStorage.getItem('flowpoint-test-v6')).apps.length, k: ['Amt', 'Avg', 'Mon'].map(x => document.getElementById('rvK' + x).textContent), seg: [...document.querySelectorAll('#rvSvc button')].map(b => b.textContent).join(','),
+      kpis: document.querySelectorAll('#rvKpis .rv-kpi').length, tips: document.querySelectorAll('#rvKpis .itip').length, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
+      side: (r => r ? Math.round(r.left) : null)(document.getElementById('rvFeedSec').getBoundingClientRect()), main: Math.round(document.querySelector('.rv-main').getBoundingClientRect().left) }));
+    await q.click('#rvQueue [data-act="rvJump"]'); await q.waitForTimeout(150);
+    const e0f = await q.evaluate(() => document.activeElement.id);
+    console.log('review empty ' + W + ':', JSON.stringify(e0), '| link → focus', e0f);
+    expect('심사 대기 빈 상태 ' + W + ': "심사 대기 0건" + 도움말 + 포트폴리오 링크(포커스 이동) · 표 없음 · 신청 0건 그대로', e0.t === '심사 대기 0건' && e0.s.length > 10 && !e0.tbl && e0.apps === 0 && e0f === 'pfH' && e0.seg === '전체 0,플로우페이 0,유동화 0', { e0, e0f });
+    expect('심사 대기 숫자 ' + W + ' (새 시나리오): 카드 4개 · ⓘ 4개 · 대기 금액 0만원 · 평균 처리 시간 기록 없음 · 이번 달 처리 0건', e0.kpis === 4 && e0.tips === 4 && e0.k.join('|') === '0만원|기록 없음|0건', e0);
+    expect('심사 대기 ' + W + ': 가로 스크롤 없음 · 이슈 피드는 ' + (W >= 1024 ? '오른쪽 칸' : '목록 아래'), e0.sw <= e0.cw && (W >= 1024 ? e0.side > e0.main + 300 : e0.side === e0.main), e0);
+    expect('관리자 로그인 ' + W + ' → 심사역 · #review · 앱 탐색 보임 · entered=true · 승인 창 없음', lgn[0] === '#review' && lgn[1] === 'v-review' && !lgn[2] && lgn[3] === '심사역' && !lgn[4] && lgS.role === 'reviewer' && lgS.entered === true, { lgn, role: lgS.role, entered: lgS.entered });
+    await qgo('sales'); await q.evaluate(() => document.getElementById('resetBtn').click()); await q.waitForTimeout(250);
+    const rs = await q.evaluate(() => [location.hash, document.querySelector('.view.on').id]), rsS = await S0();
+    await q.goto('file://' + process.argv[2]); await q.waitForTimeout(200);
+    const rs2 = await q.evaluate(() => document.querySelector('.view.on').id);
+    console.log('reset:', rs.join(' '), '| entered', rsS.entered, 'apps', rsS.apps.length, '| reopen', rs2);
+    expect('처음부터 다시 → #home, entered=true, 다시 열어도 앱 홈', rs[0] === '#home' && rs[1] === 'v-home' && rsS.entered === true && rs2 === 'v-home', { rs, entered: rsS.entered, rs2 });
+    // 예전 기록(entered 칸 없음) → 이미 쓰던 사람: 바로 앱 홈
+    await q.evaluate(() => { const k = 'flowpoint-test-v6', s = JSON.parse(localStorage.getItem(k)); delete s.entered; localStorage.setItem(k, JSON.stringify(s)); });
+    await q.goto('file://' + process.argv[2]); await q.waitForTimeout(200);
+    const old = await q.evaluate(() => document.querySelector('.view.on').id);
+    expect('예전 기록(entered 없음) → 앱 홈', old === 'v-home', old);
+    // 새 기록으로 #intro-review를 바로 열어도 승인 창 없음 · 가로 스크롤 없음 · 아직 들어가지 않은 상태 유지
+    await q.evaluate(() => localStorage.clear()); await q.goto('file://' + process.argv[2] + '#intro-review'); await q.reload(); await q.waitForTimeout(200);
+    const dr = await q.evaluate(() => [document.querySelector('.view.on').id, document.getElementById('dlg').open, document.documentElement.scrollWidth <= document.documentElement.clientWidth]), drS = await S0();
+    expect('새 기록 #intro-review 바로 열기 ' + W + ': 승인 창 없음 · 가로 스크롤 없음 · entered=false', dr[0] === 'v-intro-review' && !dr[1] && dr[2] && drS.entered === false, { dr, entered: drS.entered });
+    await c0.close();
+  }
 
   // 0. 시작: 접속 시 승인 창(이메일 발주 파일에서 읽은 2건) → 나중에
   console.log('approval prompt:', await p.evaluate(() => document.getElementById('dlg').open ? document.getElementById('dlgTitle').textContent : '(없음)'), '|', await day());
@@ -723,24 +842,106 @@ const SHOT = process.argv[3];
   s = await st(); console.log('after confirm:', s.apps.map(a => a.status));
   expect('거래 상대 확인 → 심사 대기', s.apps[0].status === 'review', s.apps[0].status);
 
-  // 6. 심사역 전환 → 심사 대기(AI 검토 보고서 예시) → 사유 고르고 승인
+  // 6. 심사역 전환 → 심사 대기(시안 1c: 숫자 4개 · 목록 · 이슈 피드) → 줄 → 상세(AI 검토 보고서) → 줄의 승인 → 사유 창(추천 사유 미리 체크) → 승인
   await role();
   console.log('hash after role:', await p.evaluate(() => location.hash), '| review tab visible:', await p.isVisible('header nav a[data-v="review"]'));
-  console.log('flags:', (await p.locator('#rvQueue .flags .tag').allTextContents()).join(' / '));
   console.log('portfolio:', (await p.locator('.pf-tbl tbody tr').evaluateAll(rs => rs.map(r => r.cells[0].querySelector('button').textContent + (r.querySelector('.tag.mute') ? '(예시)' : '') + ' ' + r.cells[6].textContent))).join(' / '));
   console.log('feed:', (await p.locator('#rvFeed [data-act="rvFilter"]').allTextContents()).join(' / '), '|', (await feedTags()).join(' / '));
-  const ai = p.locator('#rvQueue .ai-rep').first(), aiTxt = await ai.innerText();
+  const rvRows = () => p.locator('#rvQueue tbody tr').count();
+  const kpiTxt = () => p.evaluate(() => ['Amt', 'Avg', 'Mon', 'Iss'].map(x => document.getElementById('rvK' + x).textContent));
+  // 숫자 4개를 기록(S.apps)과 이슈 피드에서 따로 계산해 비교: 대기 금액 = 심사 중 신청 금액 합 · 평균 처리 시간 = 판단한 신청의 (판단일 − 신청일) 평균 · 이번 달 처리 = 판단일이 이번 달 · 이슈 = 피드 "미확인" 줄 수
+  const kpiCalc = async () => {
+    const S1 = await st(), today = isoAt(S1.dayOffset || 0), dd = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+    const pend = S1.apps.filter(a => a.status === 'review'), dec = S1.apps.filter(a => a.decision && a.date), avg = dec.length ? dec.reduce((t, a) => t + Math.max(0, dd(a.date, a.decision.date)), 0) / dec.length : null;
+    await p.click('#rvFeed [data-act="rvFilter"][data-f="open"]'); await p.waitForTimeout(100);
+    if (await p.locator('#rvFeed [data-act="rvMore"]').count()) { await p.click('#rvFeed [data-act="rvMore"]'); await p.waitForTimeout(100); }
+    const open = await p.locator('#rvFeed .rv-feed li:not(.empty)').count();
+    await p.click('#rvFeed [data-act="rvFilter"][data-f="all"]'); await p.waitForTimeout(100);
+    return [manT0({ qty: 1, price: pend.reduce((t, a) => t + a.amount, 0) / 1.1 }), avg == null ? '기록 없음' : avg < 0.05 ? '당일' : (Math.round(avg * 10) / 10) + '일',
+      S1.apps.filter(a => a.decision && a.decision.date.slice(0, 7) === today.slice(0, 7)).length + '건', open + '건'];
+  };
+  { const k1 = await kpiTxt(), c1 = await kpiCalc();
+    console.log('review kpi (1건 대기):', k1.join(' / '), '| 따로 계산', c1.join(' / '));
+    expect('심사 대기 숫자 4개 = 따로 계산한 값 (대기 금액 1,573만원 · 평균 처리 시간 기록 없음 · 이번 달 처리 0건 · 미확인 이슈)', k1.join('|') === c1.join('|') && k1[0] === '1,573만원' && k1[1] === '기록 없음' && k1[2] === '0건', { k1, c1 }); }
+  // 서비스 필터 · 고객사 검색: 유동화 → 0줄(조건 없음 안내) · 플로우페이 → 1줄 · 없는 이름 검색 → 0줄 → 필터 지우기 → 1줄 · 이름 일부 → 1줄
+  { const f = [];
+    await p.click('#rvSvc [data-f="ar"]'); await p.waitForTimeout(100); f.push(['ar', await rvRows(), await p.textContent('#rvQueue .rv-empty-t').catch(() => ''), await p.getAttribute('#rvSvc [data-f="ar"]', 'aria-pressed'), await p.evaluate(() => document.activeElement.dataset.f)]);
+    await p.click('#rvSvc [data-f="buy"]'); await p.waitForTimeout(100); f.push(['buy', await rvRows()]);
+    await p.click('#rvSvc [data-f="all"]'); await p.waitForTimeout(100);
+    await p.fill('#rvSearch', '없는회사'); await p.waitForTimeout(100); f.push(['q-none', await rvRows(), await p.textContent('#rvQueue .rv-empty-t').catch(() => '')]);
+    await p.click('#rvQueue [data-act="rvClear"]'); await p.waitForTimeout(100); f.push(['clear', await rvRows(), await p.inputValue('#rvSearch'), await p.evaluate(() => document.activeElement.id)]);
+    await p.fill('#rvSearch', s.company.slice(0, 2)); await p.waitForTimeout(100); f.push(['q-part', await rvRows()]);
+    await p.fill('#rvSearch', ''); await p.waitForTimeout(100);
+    console.log('review filter/search:', JSON.stringify(f), '| seg', (await p.locator('#rvSvc button').allTextContents()).join(' / '));
+    expect('서비스 필터 · 고객사 검색 (유동화 0줄 · 플로우페이 1줄 · 없는 이름 0줄 · 필터 지우기 1줄 · 이름 일부 1줄)', f[0][1] === 0 && f[0][2] === '조건에 맞는 신청이 없어요' && f[0][3] === 'true' && f[0][4] === 'ar' && f[1][1] === 1 &&
+      f[2][1] === 0 && f[2][2] === '조건에 맞는 신청이 없어요' && f[3][1] === 1 && f[3][2] === '' && f[3][3] === 'rvSearch' && f[4][1] === 1, f); }
+  // 목록 줄: 고객사 · 서비스 · 신청 금액 · 스코어 · 상태 + 반려(회색)·승인(색조, 채움 아님). 화면의 채움 버튼 0개
+  { const r0 = await p.evaluate(() => { const tr = document.querySelector('#rvQueue tbody tr'); return { head: [...document.querySelectorAll('#rvQueue thead th')].map(t => t.textContent), cells: [...tr.cells].map(c => c.innerText.replace(/\s+/g, ' ').trim()),
+      btn: [...tr.querySelectorAll('[data-act="rvReason"]')].map(b => b.textContent + ':' + b.className), fill: [...document.querySelectorAll('#v-review button.primary')].filter(b => b.offsetParent).length }; });
+    console.log('review row:', JSON.stringify(r0));
+    expect('목록 줄: 머리 6칸 · 고객사(신청일 줄) · 플로우페이 · 1,573만원 · 대기 · 반려 회색 · 승인 색조(채움 아님) · 채움 버튼 0개', r0.head.slice(0, 5).join() === '고객사,서비스,신청 금액,스코어,상태' && r0.cells[0].startsWith(s.company) && r0.cells[0].includes('신청 · 대성원료') &&
+      r0.cells[1] === '플로우페이' && r0.cells[2] === '1,573만원' && r0.cells[4] === '대기' && r0.btn.join('|') === '반려:small|승인:small tinted' && r0.fill === 0, r0); }
+  // 줄 안 고객사 버튼도 누르는 영역 44px 이상 (줄 전체가 상세를 열지만 키보드 초점은 이 버튼) · 줄 높이는 한 줄 표 그대로(100px 미만)
+  { const nm = await p.evaluate(() => { const b = document.querySelector('#rvQueue .rv-name'), r = b.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), row: Math.round(b.closest('tr').getBoundingClientRect().height), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }; });
+    console.log('review name button:', JSON.stringify(nm));
+    expect('심사 목록 고객사 버튼 44px 이상 · 줄 높이 100px 미만 · 가로 스크롤 없음', nm.h >= 44 && nm.w >= 44 && nm.row < 100 && nm.sw <= nm.cw, nm); }
+  // 심사역 소개 미리보기: 심사 대기 1건 → 심사 화면과 같은 건수 · 신청 금액 · 신청 기업 점수
+  { const rq = await p.evaluate(() => ({ n: document.querySelectorAll('#rvQueue tbody tr').length, qh: document.getElementById('rvQH').textContent, amt: [...document.querySelectorAll('#rvQueue .rv-am')].map(x => x.textContent),
+      sc: [...document.querySelectorAll('#rvQueue .rv-sc')].map(x => (x.textContent.match(/(\d+)/) || [])[1]) }));
+    await go('intro-review');
+    const iq = await p.evaluate(() => ({ h: document.getElementById('irQH').textContent, meta: document.getElementById('irQMeta').textContent, head: [...document.querySelectorAll('#irQHead th')].map(t => t.textContent),
+      rows: [...document.querySelectorAll('#irQRows tr')].map(r => [...r.cells].map(c => c.textContent)) }));
+    await go('review');
+    console.log('intro-review queue:', JSON.stringify(iq), '| #review', JSON.stringify(rq));
+    expect('심사역 소개 미리보기 = 심사 대기 (건수 · 고객사 · 서비스 · 신청 금액 · 스코어)', iq.h === '심사 대기' && iq.meta === rq.n + '건' && rq.qh === '심사할 신청 ' + rq.n + '건' && rq.n === 1 && iq.head.join() === '고객사,서비스,신청 금액,스코어' &&
+      iq.rows.length === rq.n && iq.rows.every((r, i) => r[0] === s.company && r[1] === '플로우페이' && r[2] === rq.amt[i] && r[3] === rq.sc[i]), { iq, rq }); }
+  if (SHOT) { await top(); await shot('08a-review-queue'); }
+  // 줄(버튼 아닌 곳)을 누르면 상세 시트: 위험 신호 · AI 검토 보고서 · 점수 근거. 닫으면 그 줄로 포커스. 키보드: 고객사 버튼 Enter → 열림, Esc → 줄로
+  await p.click('#rvQueue tbody tr td.rv-sv'); await p.waitForTimeout(150);
+  { const d0 = await p.evaluate(() => ({ open: document.getElementById('dlg').open, t: document.getElementById('dlgTitle').textContent, ai: document.querySelectorAll('#dlgBody .ai-rep').length, cols: document.querySelectorAll('#dlgBody .rv-col').length, foot: [...document.querySelectorAll('#dlgFoot button')].map(b => b.textContent).join(',') }));
+    console.log('row click → detail:', JSON.stringify(d0));
+    expect('줄 누름 → 상세 시트(심사 상세 · AI 검토 보고서 · 점수 근거 2칸 · 반려·승인)', d0.open && d0.t === '심사 상세' && d0.ai === 1 && d0.cols === 2 && d0.foot === '반려,승인', d0); }
+  console.log('flags:', (await p.locator('#dlgBody .flags .tag').allTextContents()).join(' / '));
+  const ai = p.locator('#dlgBody .ai-rep').first(), aiTxt = await ai.innerText();
   console.log('ai report: open', await ai.evaluate(d => d.open), '|', (await ai.locator('summary').innerText()).replace(/\s+/g, ' '), '|', (await ai.locator('h4').allTextContents()).join(' / '));
   console.log('ai phrases:', ['상환 매출', '최근 30일', '최근 90일', '규칙 기반 요약(AI 연동 예정)'].map(k => k + ' ' + aiTxt.includes(k)).join(' | '), '| risks', await ai.locator('.ai-risk li').count(), '| links', await ai.locator('.ai-risk li button').count(), '| checks', await ai.locator('.ai-ul').last().locator('li').count());
   console.log('ai summary:', await ai.locator('.ai-sum').textContent());
-  await into('#rvQueue .ai-rep', 140); await shot('08-review-ai');
-  await p.click('#rvQueue [data-act="rvApprove"]'); await p.waitForTimeout(120);
-  const noReason = (await st()).apps[0].status; console.log('approve w/o reason status:', (await st()).apps.map(a => a.status));
-  await p.locator('#rvQueue .reasons label', { hasText: '입금 이력 양호' }).locator('input').check();
-  await p.locator('#rvQueue .reasons label', { hasText: '세금계산서 미발행' }).locator('input').check();
-  await p.click('#rvQueue [data-act="rvApprove"]'); await p.waitForTimeout(120);
-  console.log('after approve:', (await st()).apps.map(a => a.status));
-  expect('사유 없이 승인 안 됨 · 사유 고르면 서명 대기', noReason === 'review' && (await st()).apps[0].status === 'sign', { noReason, now: (await st()).apps[0].status });
+  await shot('08-review-ai');
+  await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(150);
+  const fc1 = await p.evaluate(() => document.activeElement.classList.contains('rv-name'));
+  await p.focus('#rvQueue .rv-name'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+  const kd = await p.evaluate(() => document.getElementById('dlg').open && document.getElementById('dlgTitle').textContent);
+  await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  const fc2 = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.classList.contains('rv-name'));
+  expect('상세 시트 닫기 → 그 줄 고객사 버튼으로 포커스 · 키보드 Enter로 열고 Esc로 닫기', fc1 && kd === '심사 상세' && fc2, { fc1, kd, fc2 });
+  // 반려도 사유 필수: 줄의 반려 → 반려 사유 창(주의 근거 미리 체크) → 모두 풀면 확정 비활성, 비활성을 풀어 눌러도(규칙) 반려 안 됨
+  await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="reject"]'); await p.waitForTimeout(150);
+  { const rj = await p.evaluate(() => ({ t: document.getElementById('dlgTitle').textContent, pre: [...document.querySelectorAll('#dlgBody .reasons input:checked')].map(x => x.value), n: document.querySelectorAll('#dlgBody .reasons input').length, ok: document.getElementById('rrOk').textContent }));
+    await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click())); await p.waitForTimeout(80);
+    const off = await p.isDisabled('#rrOk'), hint = await p.textContent('#rrHint');
+    await p.evaluate(() => { const b = document.getElementById('rrOk'); b.disabled = false; b.click(); }); await p.waitForTimeout(120);
+    const after = { status: (await st()).apps[0].status, toast: await p.textContent('#toast'), open: await dlgOpen() };
+    console.log('reject sheet:', JSON.stringify(rj), '| 0개 → disabled', off, hint, '| 강제 누름', JSON.stringify(after));
+    expect('줄의 반려 → 반려 사유 창(사유 8개 · 주의 근거 미리 체크) · 0개면 확정 비활성 · 규칙상 반려 안 됨', rj.t === '반려 사유' && rj.n === 8 && rj.pre.join() === '세금계산서 미발행' && rj.ok === '반려하기' && off && hint.includes('하나 이상') &&
+      after.status === 'review' && after.toast === '판단 사유를 하나 이상 골라 주세요' && after.open, { rj, off, hint, after }); }
+  await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(150);
+  // 줄의 승인 → 승인 사유 창: AI 보고서 근거로 미리 체크(입금 이력 양호 · 세금계산서 미발행) · 0개면 비활성 → 두 사유로 승인(이전과 같은 사유 · 같은 하류 숫자)
+  await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.waitForTimeout(150);
+  { const ap0 = await p.evaluate(() => ({ t: document.getElementById('dlgTitle').textContent, pre: [...document.querySelectorAll('#dlgBody .reasons input:checked')].map(x => x.value), off: document.getElementById('rrOk').disabled, ok: document.getElementById('rrOk').className, tip: !!document.querySelector('#dlgBody .itip') }));
+    await shot('08b-review-reason');
+    await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click())); await p.waitForTimeout(80);
+    const off = await p.isDisabled('#rrOk');
+    await p.locator('#dlgBody .reasons label', { hasText: '입금 이력 양호' }).locator('input').check();
+    await p.locator('#dlgBody .reasons label', { hasText: '세금계산서 미발행' }).locator('input').check();
+    const on = !(await p.isDisabled('#rrOk'));
+    await p.click('#rrOk'); await p.waitForTimeout(200);
+    const a0 = (await st()).apps[0], fq = await p.evaluate(() => [document.getElementById('dlg').open, document.activeElement.id]);
+    console.log('approve sheet:', JSON.stringify(ap0), '| 0개 → disabled', off, '| 2개 → enabled', on, '| after approve:', (await st()).apps.map(a => a.status), a0.decision.reasons.join(','), '| focus', fq.join(' '));
+    expect('줄의 승인 → 승인 사유 창(추천 사유 미리 체크 · 확정 가능 · 채움 버튼 · ⓘ 규칙)', ap0.t === '승인 사유' && ap0.pre.join() === '입금 이력 양호,세금계산서 미발행' && !ap0.off && ap0.ok === 'primary' && ap0.tip, ap0);
+    expect('사유 0개면 확정 비활성 · 사유 고르면 승인 → 서명 대기 · 판단 사유 기록 · 창 닫히고 목록 제목으로 포커스', off && on && a0.status === 'sign' && a0.decision.result === '승인' && a0.decision.reasons.join() === '입금 이력 양호,세금계산서 미발행' && !fq[0] && fq[1] === 'rvQH', { off, on, status: a0.status, d: a0.decision, fq }); }
+  { const k2 = await kpiTxt(), c2 = await kpiCalc(), e2 = await p.textContent('#rvQueue .rv-empty-t');
+    console.log('review kpi (승인 후):', k2.join(' / '), '| 따로 계산', c2.join(' / '), '|', e2);
+    expect('승인 후 숫자 4개 = 따로 계산 (대기 금액 0만원 · 평균 처리 시간 당일 · 이번 달 처리 1건) · 빈 상태', k2.join('|') === c2.join('|') && k2[0] === '0만원' && k2[1] === '당일' && k2[2] === '1건' && e2 === '심사 대기 0건', { k2, c2, e2 }); }
 
   // 7. 고객(대표) 전자서명 → 집행, 거래 문서 7종 생성 (① 고객 발주서 완료 · ② 매입처 발주서 보냄)
   await role();
@@ -894,8 +1095,18 @@ const SHOT = process.argv[3];
   await p.click('dialog [data-act="submitApply"]'); await p.waitForTimeout(150);
   console.log('ar app:', (x => x ? x.status + ' ' + x.amount : 'none')((await st()).apps[1]));
   await role();
-  await p.locator('#rvQueue .reasons label', { hasText: '관련 거래처 우량' }).locator('input').check();
-  await p.click('#rvQueue [data-act="rvApprove"]'); await p.waitForTimeout(120);
+  // 줄의 승인 → 사유 창: 미리 체크를 풀고 '관련 거래처 우량'만 골라 승인 (이전과 같은 사유)
+  await p.click('#rvSvc [data-f="ar"]'); await p.waitForTimeout(100);
+  { const arRow = await p.evaluate(() => [...document.querySelectorAll('#rvQueue tbody tr')].map(r => r.cells[1].textContent + ' ' + r.cells[2].textContent).join(' / '));
+    await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.waitForTimeout(150);
+    const pre = await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.map(x => x.value));
+    await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click())); await p.waitForTimeout(80);
+    await p.locator('#dlgBody .reasons label', { hasText: '관련 거래처 우량' }).locator('input').check();
+    await p.click('#rrOk'); await p.waitForTimeout(150);
+    const a1 = (await st()).apps[1];
+    console.log('ar review row:', arRow, '| pre-checked', pre.join(',') || '(없음)', '| after', a1.status, a1.decision.reasons.join(','));
+    expect('유동화 필터 줄 → 승인 사유 창 → 관련 거래처 우량으로 승인 → 서명 대기', arRow === '유동화 678만원' && a1.status === 'sign' && a1.decision.reasons.join() === '관련 거래처 우량', { arRow, a1: a1.status }); }
+  await p.click('#rvSvc [data-f="all"]'); await p.waitForTimeout(100);
   await role();
   await go('factoring'); await p.click('#appsAr [data-act="sign"]'); await p.waitForTimeout(120);
   const cashBefore = (await st()).cash;
@@ -1025,6 +1236,7 @@ const SHOT = process.argv[3];
   // 16. 처음부터 다시 → 날짜·역할·기록 초기화
   await p.click('#resetBtn'); await p.waitForTimeout(150); await closePrompt();
   s = await st(); console.log('after reset: role', s.role, 'dayOffset', s.dayOffset, 'apps', s.apps.length, 'log', s.scoreLog.length, 'deals', s.deals.length, 'hash', await p.evaluate(() => location.hash), '|', await day());
+  expect('처음부터 다시 → 앱 홈(#home) · entered=true', (await p.evaluate(() => location.hash)) === '#home' && s.entered === true, s.entered);
   // 고객(대표) 역할에서 #review 직접 접근 차단
   await go('review'); console.log('ceo #review →', await p.evaluate(() => location.hash));
   console.log('errors:', errs.length ? errs : 'none');

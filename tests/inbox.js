@@ -8,6 +8,7 @@ const FILE = 'file://' + process.argv[2];
 const arg = k => (process.argv.find(a => a.startsWith('--' + k + '=')) || '').split('=').slice(1).join('=') || null;
 const SHOT = arg('shots'), XLSX_LOCAL = arg('xlsx');
 const KEY = 'flowpoint-test-v6', CDN = /cdn\.jsdelivr\.net\/npm\/xlsx@0\.18\.5/;
+const NET_ERR = /^(Failed to load resource|Failed to decode downloaded font|OTS parsing error|Access to font at)/;  // 글꼴·네트워크 요청 실패는 페이지 오류가 아님 (pageerror·스크립트 오류만 셈)
 const fails = [];
 const check = (ok, msg) => { console.log((ok ? 'ok   ' : 'FAIL ') + msg); if (!ok) fails.push(msg); };
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fp-inbox-'));
@@ -29,9 +30,9 @@ const csv2 = write('vendor_orders.csv', '매입처\titem\tqty\tunit price\tdue\n
   const b = await chromium.launch({ env: Object.assign({}, process.env, { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' }) });
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, acceptDownloads: true });
   const p = await ctx.newPage();
-  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
   if (XLSX_LOCAL) await ctx.route(CDN, r => r.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(XLSX_LOCAL) }));
-  await p.goto(FILE); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200);
+  await p.goto(FILE + '#home'); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200);
   const st = () => p.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
   const go = async h => { await p.evaluate(x => location.hash = x, h); await p.waitForTimeout(150); };
   const dlgOpen = () => p.evaluate(() => document.getElementById('dlg').open);
@@ -241,7 +242,7 @@ const csv2 = write('vendor_orders.csv', '매입처\titem\tqty\tunit price\tdue\n
     const c2 = await b.newContext({ viewport: { width: 390, height: 844 } }); const q = await c2.newPage();
     const e2 = []; q.on('pageerror', e => e2.push(e.message)); q.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) e2.push(m.text()); });
     await c2.route(CDN, r => r.abort());
-    await q.goto(FILE); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(150);
+    await q.goto(FILE + '#home'); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(150);
     if (await q.evaluate(() => document.getElementById('dlg').open)) await q.click('#dlgLeft [data-act="close"]');
     await q.evaluate(() => location.hash = 'inbox'); await q.waitForTimeout(120);
     const n0 = (await q.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY)).inbox.length;
@@ -259,9 +260,9 @@ const csv2 = write('vendor_orders.csv', '매입처\titem\tqty\tunit price\tdue\n
   // 페이지가 엑셀을 처음 올릴 때 직접 SheetJS를 불러오는 경로 (무결성 해시·CORS 포함)
   if (xlsxB64){
     const c3 = await b.newContext({ viewport: { width: 1280, height: 900 } }); const q = await c3.newPage();
-    const e3 = []; q.on('pageerror', e => e3.push(e.message)); q.on('console', m => { if (m.type() === 'error') e3.push(m.text()); });
+    const e3 = []; q.on('pageerror', e => e3.push(e.message)); q.on('console', m => { if (m.type() === 'error' && !NET_ERR.test(m.text())) e3.push(m.text()); });
     if (XLSX_LOCAL) await c3.route(CDN, r => r.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(XLSX_LOCAL) }));
-    await q.goto(FILE); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(150);
+    await q.goto(FILE + '#home'); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(150);
     if (await q.evaluate(() => document.getElementById('dlg').open)) await q.click('#dlgLeft [data-act="close"]');
     await q.evaluate(() => location.hash = 'inbox'); await q.waitForTimeout(120);
     check(!(await q.evaluate(() => !!window.XLSX)), '처음에는 SheetJS를 불러오지 않음');

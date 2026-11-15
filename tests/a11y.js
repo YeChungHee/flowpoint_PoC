@@ -3,6 +3,7 @@
 const { chromium } = require('playwright');
 const FILE = 'file://' + process.argv[2];
 const KEY = 'flowpoint-test-v6';
+const NET_ERR = /^(Failed to load resource|Failed to decode downloaded font|OTS parsing error|Access to font at)/;  // 글꼴·네트워크 요청 실패는 페이지 오류가 아님 (pageerror·스크립트 오류만 셈)
 // 'prompt'(접속 시 승인 창)·'ibdetail'(수집함 승인 줄을 눌러 연 상세 시트: 발주 칸 확인 필요 · 승인·수정·반려)·'ibedit'(상세 → 수정 시트, 새 거래 후보 계산서)·'docprev'(거래 문서 미리보기)·'delivery'(납품 확인 시트)는 해시가 아니라 시트를 연 상태
 // 'notif'(알림함 시트)·'thanks'(감사 메일 미리보기, 결제 캘린더의 결제 완료 카드에서)도 시트를 연 상태. 'calendar'는 집행 후 결제 1건이 있는 결제 캘린더
 // 'saledetail'은 #sales에서 연체 줄을 눌러 연 거래 상세 시트, 'newtrade'는 "+ 새 거래" 입력 시트
@@ -15,8 +16,11 @@ const KEY = 'flowpoint-test-v6';
 // 'score-ledger'는 #score(우리 회사)의 근거 원장에 결과 6가지(진행 중 · 완납 · 연체 · 연체 후 완납 · 부족 해소 · 부족 미해소)가 모두 있고 "더 보기"를 펼친 상태.
 // 'score'에는 시나리오용 2건, 'shortsheet'의 판단 구간에는 "지난 같은 상황" 표가 있어야 함(없으면 route 실패)
 // 'dealdetail'은 #deals에서 거래 하나를 연 상태(좁은 화면은 상세만), 'link'는 매입처 외부용 화면(#link/<token>, 1단계 발주서 열람)
-const HASHES = ['home', 'inbox', 'report', 'report-ar', 'report-ap', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet', 'report-linked', 'score-ledger'];
-const SHEETS = ['prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet'];
+// 'intro'는 고객 소개 페이지(첫 화면 · 사이드바·탭 바 없음, 자금일보 카드 막대 차트 포함)
+// 'intro-review'는 심사역 소개 페이지(새 기록: 미리보기는 고객사 포트폴리오 줄), 'intro-review-q'는 심사 대기 1건이 있을 때(미리보기는 심사 대기 줄)
+// 'review'는 심사 대기 1건(목록 표 · 이슈 피드), 'review-empty'는 새 시나리오의 심사 대기 0건 빈 상태, 'rvdetail'은 목록 줄을 눌러 연 상세 시트(AI 검토 보고서), 'rvreason'은 줄의 승인으로 연 판단 사유 창
+const HASHES = ['intro', 'intro-review', 'intro-review-q', 'home', 'inbox', 'report', 'report-ar', 'report-ap', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'review-empty', 'rvdetail', 'rvreason', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet', 'report-linked', 'score-ledger'];
+const SHEETS = ['rvdetail', 'rvreason', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet'];
 const SIZES = { 1280: 800, 820: 1180, 390: 844 };
 
 // 알고 있는 예외 (실패로 세지 않고 이유와 함께 따로 보여 준다). key는 "점검|선택자" 앞부분과 비교
@@ -154,8 +158,8 @@ const AUDIT = () => {
     const prev = host.previousElementSibling;
     if (!prev || !visible(prev) || !/\d/.test(prev.textContent)) charts.push({ key: id + ' sum', msg: '차트 바로 위에 수치가 든 한 줄 요약이 없음' });
   }
-  // HTML로 그린 막대 차트(자금일보 받을 돈 나이 · 거래처 쏠림): role=img + 수치가 든 설명
-  for (const el of document.querySelectorAll('#rpAge, #rpConc')){
+  // HTML로 그린 막대 차트(자금일보 받을 돈 나이 · 거래처 쏠림 · 소개 페이지 자금일보 카드): role=img + 수치가 든 설명
+  for (const el of document.querySelectorAll('#rpAge, #rpConc, #itBars')){
     if (!visible(el)) continue;
     nChart++;
     const lb = el.getAttribute('aria-label') || '';
@@ -310,13 +314,28 @@ async function openHash(p, h){
     await p.click('#scSales [data-act="scOpen"]'); await p.waitForTimeout(150);
     return;
   }
+  if (h === 'review-empty'){
+    await p.evaluate(k => { const s = JSON.parse(localStorage.getItem(k)); s.role = 'reviewer'; localStorage.setItem(k, JSON.stringify(s)); }, KEY);
+    await p.reload(); await p.waitForTimeout(150);
+    await p.evaluate(() => { if (document.getElementById('dlg').open) document.querySelector('#dlgLeft [data-act="close"]').click(); location.hash = 'review'; }); await p.waitForTimeout(150);
+    return;
+  }
+  if (h === 'rvdetail' || h === 'rvreason'){
+    await p.evaluate(() => location.hash = 'review'); await p.waitForTimeout(150);
+    await p.evaluate(x => document.querySelector(x === 'rvdetail' ? '#rvQueue tbody tr td.rv-sv' : '#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]').click(), h); await p.waitForTimeout(150);
+    return;
+  }
+  if (h === 'intro-review-q'){
+    await p.evaluate(() => location.hash = 'intro-review'); await p.waitForTimeout(150);
+    return;
+  }
   await p.evaluate(x => location.hash = x, h); await p.waitForTimeout(150);
 }
 
 // 심사 대기 1건이 있는 상태를 만든다 (flow.js 3단계와 같은 순서)
 async function makeReviewState(b){
   const ctx = await b.newContext({ viewport: { width: 1200, height: 900 } }); const p = await ctx.newPage();
-  await p.goto(FILE); await p.evaluate(() => localStorage.clear()); await p.reload();
+  await p.goto(FILE + '#home'); await p.evaluate(() => localStorage.clear()); await p.reload();
   if (await p.evaluate(() => document.getElementById('dlg').open)) await p.click('#dlgLeft [data-act="close"]');  // 접속 시 승인 창 닫기
   const next = async () => { await p.click('#dlgFoot [data-act="stepNext"]'); await p.waitForTimeout(120); };
   await p.evaluate(() => location.hash = 'orders'); await p.waitForTimeout(120);
@@ -333,8 +352,11 @@ async function makeReviewState(b){
   const st = JSON.parse(await p.evaluate(k => localStorage.getItem(k), KEY));
   // 거래 문서 상태: 심사 승인 → 전자서명(매입처 링크 1단계) → 링크 서명·역발행 승인 → 276 지급·발행(납품 확인 대기)
   await p.click('#roleBtn'); await p.waitForTimeout(150);
-  await p.locator('#rvQueue .reasons label', { hasText: '입금 이력 양호' }).locator('input').check();
-  await p.click('#rvQueue [data-act="rvApprove"]'); await p.waitForTimeout(120);
+  // 심사 대기 줄의 승인 → 사유 창: 미리 체크를 풀고 '입금 이력 양호'만 골라 승인
+  await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.waitForTimeout(150);
+  await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click()));
+  await p.locator('#dlgBody .reasons label', { hasText: '입금 이력 양호' }).locator('input').check();
+  await p.click('#rrOk'); await p.waitForTimeout(150);
   await p.click('#roleBtn'); await p.waitForTimeout(150);
   await p.click('[data-act="sign"]'); await p.waitForTimeout(150);
   const signSt = await p.evaluate(k => localStorage.getItem(k), KEY);
@@ -370,7 +392,7 @@ async function makeReviewState(b){
   ledSt.decisions.push(mk('a11y-app', { choice: 'approve', reason: '추천안', appId: ledSt.apps[0].id, result: null }), mk('a11y-wait', { reason: '기타', memo: '다음 주 투자금 입금 예정', by: 'staff', result: null, sf: { start: '2999-01-01', need: 2320000 } }),
     mk('a11y-late', { choice: 'approve', reason: '추천안', appId: 'none', result: { k: 'late', date: t1, note: '예시 신청', delta: -120 } }), mk('a11y-lr', { choice: 'approve', reason: '추천안', appId: 'none', result: { k: 'lateRepaid', date: t1, note: '예시 신청', delta: 25 } }));
   st.role = 'reviewer';
-  return { 'score-ledger': JSON.stringify(ledSt), review: JSON.stringify(st), link: signSt, deals: JSON.stringify(ready), dealdetail: JSON.stringify(ready), docprev: JSON.stringify(ready), delivery: JSON.stringify(ready),
+  return { 'score-ledger': JSON.stringify(ledSt), review: JSON.stringify(st), rvdetail: JSON.stringify(st), rvreason: JSON.stringify(st), 'intro-review-q': JSON.stringify(st), link: signSt, deals: JSON.stringify(ready), dealdetail: JSON.stringify(ready), docprev: JSON.stringify(ready), delivery: JSON.stringify(ready),
     actsheet: JSON.stringify(st), calendar: JSON.stringify(ready), notif: JSON.stringify(thanksSt), thanks: JSON.stringify(thanksSt),
     fwdsheet: JSON.stringify(ready), sales: later, flowpay: fwd1 };
 }
@@ -378,8 +400,8 @@ async function makeReviewState(b){
 async function newPage(b, opt, state){
   const ctx = await b.newContext({ viewport: { width: opt.w, height: opt.h }, deviceScaleFactor: opt.dsf || 1, colorScheme: opt.scheme || 'light', reducedMotion: opt.motion || 'no-preference', forcedColors: opt.forced || 'none', contrast: opt.contrast || 'no-preference' });
   const p = await ctx.newPage();
-  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(FILE);
+  const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
+  await p.goto(FILE + '#home');
   await p.evaluate(([k, s]) => { localStorage.clear(); if (s) localStorage.setItem(k, s); }, [KEY, state || null]);
   await p.reload(); await p.waitForTimeout(100);
   // 접속 시 승인 창(시나리오 수집 후보)은 '나중에'로 닫고 화면을 점검한다 (창 자체는 'prompt' 항목에서 점검)
@@ -395,12 +417,21 @@ async function auditPass(b, opt, reviewState, label){
     await openHash(p, h);
     const ctxName = label + ' #' + h;
     const now = await p.evaluate(() => location.hash);
-    if (h !== 'company' && h !== 'link' && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h.replace(/-(a[rp]|linked|ledger)$/, '')) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
+    if (h !== 'company' && h !== 'link' && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h.replace(/-(a[rp]|linked|ledger|q|empty)$/, '')) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
+    // 심사 대기: 1건(목록 표) · 빈 상태(심사 대기 0건)가 실제로 점검 대상인지
+    if (h === 'review' || h === 'review-empty'){
+      const rv = await p.evaluate(() => [document.querySelectorAll('#rvQueue tbody tr').length, (document.querySelector('#rvQueue .rv-empty-t') || {}).textContent || '']);
+      if (h === 'review' ? rv[0] !== 1 : rv[0] !== 0 || rv[1] !== '심사 대기 0건') fail('route', h, '심사 대기 화면 상태가 기대와 다름 (' + rv + ')', ctxName);
+    }
     if (SHEETS.includes(h) && !(await p.evaluate(() => document.getElementById('dlg').open))) fail('route', h, '시트가 열리지 않음', ctxName);
     // 근거 원장 · 지난 같은 상황이 점검 대상에 실제로 들어 있는지
     const led = await p.evaluate(() => [document.querySelectorAll('#scLedger .led-rec').length, [...new Set([...document.querySelectorAll('#scLedger .led-rec')].map(l => l.dataset.res))].sort().join(), document.querySelectorAll('#sfPast tbody tr').length]);
     if (h === 'score' && led[0] < 2) fail('route', h, '근거 원장 기록이 없음 (' + led + ')', ctxName);
     if (h === 'score-ledger' && (led[0] !== 6 || led[1] !== 'late,lateRepaid,repaid,resolved,unresolved,wait')) fail('route', h, '근거 원장 결과 6가지가 아님 (' + led + ')', ctxName);
+    if (h.indexOf('intro-review') === 0){
+      const iq = await p.evaluate(() => [document.getElementById('irQH').textContent, document.querySelectorAll('#irQRows tr').length]);
+      if (iq[0] !== (h === 'intro-review-q' ? '심사 대기' : '고객사 포트폴리오') || !iq[1]) fail('route', h, '심사역 소개 미리보기가 기대와 다름 (' + iq + ')', ctxName);
+    }
     if (h === 'shortsheet' && led[2] < 2) fail('route', h, '지난 같은 상황 표가 없음 (' + led + ')', ctxName);
     const r = await p.evaluate(AUDIT);
     count('contrast', r.n.contrast); count('target', r.n.target); count('overflow', 1); count('charts', r.n.charts);
@@ -542,6 +573,21 @@ async function keyboardPass(b, reviewState){
     await p.focus('#saleRows .tr-fold'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
     const fo = await p.evaluate(() => [document.activeElement.classList.contains('tr-fold'), document.activeElement.getAttribute('aria-expanded'), document.querySelectorAll('#saleRows li.tr-done[hidden]').length]);
     if (!fo[0] || fo[1] !== 'true' || fo[2] !== 0) fail('keys', 'fold-enter', '"완료 N건" 펼침이 Enter로 열리지 않거나 포커스를 잃음 (' + fo + ')', C);
+    await ctx.close();
+  }
+  // (2-1b) 심사 대기 목록: 줄의 승인 Enter → 사유 창(포커스는 시트 안 · 추천 사유 체크 · 확정 활성), 사유를 모두 풀면 확정 비활성, Esc → 그 줄 승인 버튼으로 포커스
+  {
+    const { ctx, p } = await newPage(b, { w: 1280, h: 800 }, reviewState.review);
+    await p.evaluate(() => location.hash = 'review'); await p.waitForTimeout(150);
+    count('keys', 2);
+    await p.focus('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+    const o = await p.evaluate(() => [document.getElementById('dlg').open, !!document.activeElement.closest('dialog'), document.getElementById('dlgTitle').textContent, document.querySelectorAll('#dlgBody .reasons input:checked').length, document.getElementById('rrOk').disabled]);
+    await p.evaluate(() => document.querySelectorAll('#dlgBody .reasons input:checked').forEach(x => x.click())); await p.waitForTimeout(80);
+    const off = await p.evaluate(() => document.getElementById('rrOk').disabled);
+    if (!o[0] || !o[1] || o[2] !== '승인 사유' || !o[3] || o[4] || !off) fail('keys', 'rv-reason-open', '줄의 승인 Enter로 사유 창이 열리고(포커스 시트 안 · 추천 사유 체크 · 확정 활성) 사유 0개면 비활성이 아님 (' + o + ', ' + off + ')', C + ' #review');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+    const back = await p.evaluate(() => !document.getElementById('dlg').open && document.activeElement.dataset.act + ':' + document.activeElement.dataset.r);
+    if (back !== 'rvReason:approve') fail('keys', 'rv-reason-esc', 'Esc 후 사유 창이 닫히고 그 줄 승인 버튼으로 포커스가 돌아오지 않음 (' + back + ')', C + ' #review');
     await ctx.close();
   }
   // (2-2) 부족 해결 시트: 홈 오늘 할 일의 "부족 해결"에서 Enter → 시트(맨 위 "이상" 금액에 포커스), Esc → 닫히고 연 버튼으로 포커스.
