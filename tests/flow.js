@@ -412,7 +412,14 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
       const h0 = await p.evaluate(() => [document.getElementById('holdDlg').open, document.getElementById('holdOk').disabled, document.activeElement.name]);
       await p.evaluate(() => document.getElementById('holdOk').click()); await p.waitForTimeout(80);
       const n0 = await nDec();
-      await p.check('#holdBody input[value="기타"]'); await p.waitForTimeout(60);
+      // 보류 사유 칩은 하나만: 비용 부담 → 기타를 누르면 기타만 켜짐(비용 부담은 풀리고 ✓ 사라짐)
+      const holdOn = () => p.evaluate(() => [...document.querySelectorAll('#holdBody label.chip')].filter(l => l.querySelector('input').checked && getComputedStyle(l.querySelector('.ck')).display !== 'none').map(l => l.textContent.trim()).join());
+      await p.locator('#holdBody label.chip', { hasText: '비용 부담' }).click(); await p.waitForTimeout(60);
+      const hs1 = [await holdOn(), await p.isDisabled('#holdOk')];
+      await p.locator('#holdBody label.chip', { hasText: '기타' }).click(); await p.waitForTimeout(60);
+      const hs2 = [await holdOn(), await p.locator('#holdBody input[name="holdR"]:checked').count()];
+      console.log('hold chips single-select:', hs1, '→', hs2);
+      expect('보류 사유 칩은 하나만 고름 (비용 부담 → 기타: 기타만 켜짐) · 비용 부담이면 바로 기록 가능', hs1[0] === '비용 부담' && !hs1[1] && hs2[0] === '기타' && hs2[1] === 1, { hs1, hs2 });
       const h1 = await p.evaluate(() => [document.getElementById('holdOk').disabled, document.getElementById('holdOk').textContent]);
       await p.fill('#holdMemo', '   '); await p.waitForTimeout(60);
       const h2 = await p.isDisabled('#holdOk');
@@ -498,6 +505,13 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
     const apTxt = (await p.locator('#outList h3').allInnerTexts()).map(t => t.replace(/\s+/g, ' ')).join(' / ');
     console.log('tabs: ArrowRight', t2, 'focus', f2, '| 줄 돈', (await p.textContent('#rpApTot')).trim(), '|', apTxt);
     expect('오른쪽 화살표: 줄 돈 탭(포커스 이동) · 플로우페이 대상 / 직접 결제 묶음', t2 === 'ap' && f2 === 'rpTab-ap' && apTxt.includes('플로우페이 대상') && apTxt.includes('직접 결제'), { t2, f2, apTxt });
+    // 캡처: 탭 묶음(줄 돈) ~ 맨 아래 테스트 막대(날짜 이동 버튼)까지 한 장 (화면 높이보다 길어 페이지 캡처에서 잘라냄)
+    if (SHOT) { await p.evaluate(() => document.activeElement.blur()); await p.mouse.move(0, 0); await p.waitForTimeout(250);
+      // 창 높이를 페이지 높이로 잠깐 늘려(사이드바도 끝까지 그려짐) 제목 ~ 테스트 막대를 자른 뒤 1280×900으로 되돌림
+      const y1 = await p.evaluate(() => document.documentElement.scrollHeight); await p.setViewportSize({ width: 1280, height: y1 }); await p.waitForTimeout(200);
+      const y0 = await p.evaluate(() => Math.max(0, document.querySelector('#reportBody h1, #reportBody h2').getBoundingClientRect().top + scrollY - 32)), y2 = await p.evaluate(() => document.documentElement.scrollHeight);
+      await p.screenshot({ path: SHOT + '/01m-report-tabs-testbar.png', clip: { x: 0, y: y0, width: 1280, height: Math.min(y1, y2) - y0 } });
+      await p.setViewportSize({ width: 1280, height: 900 }); await p.waitForTimeout(150); await p.focus('#rpTab-ap'); }
     await p.reload(); await p.waitForTimeout(150); await closePrompt(); await go('report');
     const t3 = await selTab();
     await p.focus('#rpTab-ap'); await p.keyboard.press('Home'); await p.waitForTimeout(120);
@@ -725,6 +739,7 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   console.log('staff checked:', (await st()).inbox.map(c => c.party + ' ' + c.status).join(' / '), '| orders as staff:', await p.locator('#orderRows [data-act="ceoReq"], #orderRows [data-act="finance"]').first().textContent());
   await p.click('#staffBtn'); await p.waitForTimeout(150); await closePrompt(); await go('inbox');
   await top(); await shot('02-inbox-approve');
+  if (SHOT) { await into('#ibCh', 120); await shot('02c-inbox-channels'); }
   console.log('inbox ceo:', await p.textContent('#ibHead'), '|', await p.textContent('#ibBar [data-act="ibApproveAll"]'), '| checked tags', await p.locator('#ibList .tag.ok', { hasText: '담당자 확인 완료' }).count());
   const rowB = await p.locator('#ibList .ib-row').evaluateAll(ls => ls.map(l => [...l.querySelectorAll('button')].filter(b => !b.classList.contains('ib-open')).map(b => b.textContent)));
   expect('승인함 줄마다 버튼 하나 "승인" (수정·반려는 줄을 눌러 상세 시트)', rowB.length === 2 && rowB.every(b => b.length === 1 && b[0] === '승인') && (await p.locator('#ibList [data-act="ibEdit"], #ibList [data-act="ibReject"]').count()) === 0, rowB);
@@ -798,7 +813,7 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   await next(); // ① 매입 확인 → ② 상환할 매출 묶기
   const step2 = async () => (await p.locator('#fpCover').innerText()).replace(/\s+/g, ' ') + ' | ' + await p.textContent('#dlgFoot .step-btn.primary') + ' disabled ' + await p.isDisabled('#dlgFoot .step-btn.primary');
   console.log('step2 title:', await p.textContent('#dlg .step-t'), '| none:', await step2());
-  await p.locator('dialog label.check', { hasText: '그린마켓' }).locator('input').check(); await p.waitForTimeout(150);
+  await p.locator('dialog label.crow', { hasText: '그린마켓' }).click(); await p.waitForTimeout(150);
   console.log('step2 그린마켓만:', await step2());
   await p.locator('#dlg .docrow', { hasText: '330만원' }).locator('input').check(); await p.waitForTimeout(150);
   console.log('step2 +한결푸드 330만원:', await step2());
@@ -811,13 +826,35 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   await shot('05-apply-docs');
   while (await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').count()) { await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').first().click(); await p.waitForTimeout(120); }
   await next(); // ③ → ④ 납품액·상환 일정 확인 후 신청
-  console.log('step4 tier:', (await p.locator('#tierSeg [aria-pressed="true"]').textContent()), '| table:', (await p.locator('#dlg .stmt:not(.fp-alloc) tbody tr').allTextContents()).join(' / '));
+  // 결제 기간 숫자 조절기(30 → 60 → 90일): 값 · 끝값(버튼 멈춤 · 90일만 주황) · 옆의 가산율·납품액 · 표 · 포커스 · 튕김
+  const ORANGE = 'rgb(163, 106, 0)';  // --tk-edge-num 라이트 = warning-800
+  const tierNow = () => p.evaluate(() => { const i = document.getElementById('tierIn'), s = i.closest('.stp'), w = s.querySelector('.stp-well');
+    return { v: +i.value, vt: i.getAttribute('aria-valuetext'), dn: s.querySelector('[data-dir="-1"]').getAttribute('aria-disabled'), up: s.querySelector('[data-dir="1"]').getAttribute('aria-disabled'), max: s.classList.contains('is-max'),
+      col: getComputedStyle(i).color, end: s.nextElementSibling.textContent, spring: w.classList.contains('rolling'), foc: document.activeElement.id, calc: document.getElementById('tierCalc').textContent.replace(/\s+/g, ' '),
+      sup: [...document.querySelectorAll('#dlg .stmt:not(.fp-alloc) tbody tr')].map(r => r.cells[2].textContent).join(' / '), kvRate: [...document.querySelectorAll('#dlg dl.kv dt')].find(d => d.textContent === '가산율').nextElementSibling.textContent }; });
+  const settle = () => p.waitForTimeout(420);  // 튕김(340ms)이 끝난 뒤 글자색 확인
+  const fpWant = async t => { const x = (await st()).purchases.find(y => y.qty === 650 && y.party === '대성원료'), r = { 30: 0.033, 60: 0.066, 90: 0.1 }[t], bs = x.qty * x.price, sup = Math.round(bs * (1 + r)), vat = Math.round(sup * 0.1), n = v => v.toLocaleString('ko-KR');
+    return { calc: '가산율 ' + (r * 100).toFixed(1) + '% · 납품액 ' + n(sup + vat) + '원', sup: [n(sup), n(vat), n(sup + vat)].join(' / '), kvRate: (r * 100).toFixed(1) + '% (결제 기간 ' + t + '일)' }; };
+  const tierOk = async (t, T) => { const w = await fpWant(t); return T.v === t && T.vt === t + '일' && T.calc.startsWith(w.calc) && T.sup === w.sup && T.kvRate === w.kvRate; };
+  let T = await tierNow();
+  console.log('step4 tier:', T.v + '일 · ' + T.calc, '| table:', (await p.locator('#dlg .stmt:not(.fp-alloc) tbody tr').allTextContents()).join(' / '));
   console.log('step4 kv:', (await p.locator('#dlg dl.kv').last().textContent()).replace(/\s+/g, ' '));
   console.log('step4 alloc:', (await p.locator('#dlg .fp-alloc tbody tr').evaluateAll(rs => rs.map(r => [...r.cells].map(c => c.textContent).join(' ')))).join(' / '), '|', (await p.locator('#fpCover').innerText()).replace(/\s+/g, ' '));
+  expect('결제 기간 조절기 30일(제안 · 최소): [−] 멈춤 · 주황 아님 · 가산율 3.3%·납품액 = 산식', await tierOk(30, T) && T.calc.includes('제안 30일 (지금 기간)') && T.dn === 'true' && T.up === 'false' && !T.max && T.col !== ORANGE && T.end === '', T);
   // 결제 기간을 90일로 바꾸면 납품액이 묶은 매출보다 커져 신청 막힘 → 제안값으로 되돌림
-  await p.click('#tier90'); await p.waitForTimeout(120);
+  await p.click('#tierIn_up'); T = await tierNow(); await settle();
+  console.log('step4 60일:', T.calc, '|', (await p.locator('#fpCover').innerText()).replace(/\s+/g, ' '));
+  expect('결제 기간 [+] 30 → 60일: 가산율 6.6% · 납품액·표·가산율 줄 = 예전 탭과 같은 산식 · 누른 버튼에 포커스 · 튕김', await tierOk(60, T) && T.dn === 'false' && T.up === 'false' && !T.max && T.foc === 'tierIn_up' && T.spring, T);
+  await p.click('#tierIn_up'); T = await tierNow(); await settle(); const T90 = await tierNow();
+  await p.locator('#tierIn').evaluate(e => e.closest('.stp-row').scrollIntoView({ block: 'center' })); await shot('06a-apply-tier90');
   console.log('step4 90일:', await p.textContent('#dlgFoot [data-act="submitApply"]'), 'disabled', await p.isDisabled('#dlgFoot [data-act="submitApply"]'), '|', (await p.locator('#fpCover').innerText()).replace(/\s+/g, ' '));
-  await p.click('#tier30'); await p.waitForTimeout(120);
+  expect('결제 기간 [+] 60 → 90일(최대): 가산율 10.0% · 납품액 = 산식 · 숫자 주황 · [+] 멈춤 · "가장 긴 기간이에요" · 포커스 그대로', await tierOk(90, T) && T.spring && T90.max && T90.col === ORANGE && T90.up === 'true' && T90.dn === 'false' && T90.end === '가장 긴 기간이에요' && T90.foc === 'tierIn_up', T90);
+  await p.click('#tierIn_up', { force: true }); await p.waitForTimeout(80); T = await tierNow();
+  expect('90일에서 [+]를 눌러도 그대로 (한 바퀴 돌지 않음)', T.v === 90 && T.foc === 'tierIn_up', T);
+  await p.focus('#tierIn'); await p.keyboard.press('ArrowDown'); T = await tierNow();
+  expect('결제 기간 칸 ↓: 90 → 60일 (포커스는 칸에)', await tierOk(60, T) && T.foc === 'tierIn', T);
+  await p.keyboard.press('Home'); await settle(); T = await tierNow();
+  expect('결제 기간 칸 Home: 30일(제안)로 · 주황 아님', await tierOk(30, T) && T.foc === 'tierIn' && T.dn === 'true' && T.col !== ORANGE, T);
   await shot('06-apply-price');
   await p.click('dialog [data-act="submitApply"]'); await p.waitForTimeout(150);
   s = await st(); console.log('app status after submit:', s.apps.map(a => a.status));
@@ -916,8 +953,9 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   expect('상세 시트 닫기 → 그 줄 고객사 버튼으로 포커스 · 키보드 Enter로 열고 Esc로 닫기', fc1 && kd === '심사 상세' && fc2, { fc1, kd, fc2 });
   // 반려도 사유 필수: 줄의 반려 → 반려 사유 창(주의 근거 미리 체크) → 모두 풀면 확정 비활성, 비활성을 풀어 눌러도(규칙) 반려 안 됨
   await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="reject"]'); await p.waitForTimeout(150);
-  { const rj = await p.evaluate(() => ({ t: document.getElementById('dlgTitle').textContent, pre: [...document.querySelectorAll('#dlgBody .reasons input:checked')].map(x => x.value), n: document.querySelectorAll('#dlgBody .reasons input').length, ok: document.getElementById('rrOk').textContent }));
-    await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click())); await p.waitForTimeout(80);
+  { const rj = await p.evaluate(() => ({ t: document.getElementById('dlgTitle').textContent, pre: [...document.querySelectorAll('#dlgBody .tk-chips input:checked')].map(x => x.value), n: document.querySelectorAll('#dlgBody .tk-chips input').length, ok: document.getElementById('rrOk').textContent }));
+    await shot('08c-review-reject-chips');
+    for (const r of rj.pre) { await p.locator('#dlgBody label.chip', { hasText: r }).click(); await p.waitForTimeout(60); }  // 입체 칩을 눌러 미리 체크를 풂
     const off = await p.isDisabled('#rrOk'), hint = await p.textContent('#rrHint');
     await p.evaluate(() => { const b = document.getElementById('rrOk'); b.disabled = false; b.click(); }); await p.waitForTimeout(120);
     const after = { status: (await st()).apps[0].status, toast: await p.textContent('#toast'), open: await dlgOpen() };
@@ -927,12 +965,21 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   await p.click('#dlgLeft [data-act="close"]'); await p.waitForTimeout(150);
   // 줄의 승인 → 승인 사유 창: AI 보고서 근거로 미리 체크(입금 이력 양호 · 세금계산서 미발행) · 0개면 비활성 → 두 사유로 승인(이전과 같은 사유 · 같은 하류 숫자)
   await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.waitForTimeout(150);
-  { const ap0 = await p.evaluate(() => ({ t: document.getElementById('dlgTitle').textContent, pre: [...document.querySelectorAll('#dlgBody .reasons input:checked')].map(x => x.value), off: document.getElementById('rrOk').disabled, ok: document.getElementById('rrOk').className, tip: !!document.querySelector('#dlgBody .itip') }));
+  { const ap0 = await p.evaluate(() => ({ t: document.getElementById('dlgTitle').textContent, pre: [...document.querySelectorAll('#dlgBody .tk-chips input:checked')].map(x => x.value), off: document.getElementById('rrOk').disabled, ok: document.getElementById('rrOk').className, tip: !!document.querySelector('#dlgBody .itip') }));
     await shot('08b-review-reason');
-    await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click())); await p.waitForTimeout(80);
-    const off = await p.isDisabled('#rrOk');
-    await p.locator('#dlgBody .reasons label', { hasText: '입금 이력 양호' }).locator('input').check();
-    await p.locator('#dlgBody .reasons label', { hasText: '세금계산서 미발행' }).locator('input').check();
+    // 입체 칩을 마우스로 눌러 풀고 다시 고름: 아래 체크박스 · 접근성 상태(checkbox checked) · 눌린 모양(오목 + ✓ + 굵게)이 함께 바뀜
+    const chipSt = async n => { const a = await p.getByRole('checkbox', { name: n, exact: true }).isChecked();
+      return Object.assign({ a }, await p.evaluate(x => { const l = [...document.querySelectorAll('#dlgBody label.chip')].find(c => c.textContent.trim() === x), cs = getComputedStyle(l);
+        return { on: l.querySelector('input').checked, ck: getComputedStyle(l.querySelector('.ck')).display !== 'none', inset: (cs.boxShadow.match(/inset/g) || []).length === (cs.boxShadow.match(/rgba?\(/g) || []).length, bold: +cs.fontWeight >= 700, ink: cs.color }; }, n)); };
+    const chip0 = await chipSt('입금 이력 양호');
+    for (const r of ap0.pre) { await p.locator('#dlgBody label.chip', { hasText: r }).click(); await p.waitForTimeout(60); }
+    const chip1 = await chipSt('입금 이력 양호'), off = await p.isDisabled('#rrOk'), n0 = await p.locator('#dlgBody .tk-chips input:checked').count();
+    for (const r of ['입금 이력 양호', '세금계산서 미발행']) { await p.locator('#dlgBody label.chip', { hasText: r }).click(); await p.waitForTimeout(60); }
+    const chip2 = await chipSt('입금 이력 양호');
+    console.log('chip 입금 이력 양호: on', JSON.stringify(chip0), '→ off', JSON.stringify(chip1), '→ on', JSON.stringify(chip2));
+    expect('입체 칩을 누르면 아래 체크박스·접근성 상태(checked)·눌린 모양(오목 · ✓ · 굵게)이 함께 켜고 꺼짐', chip0.on && chip0.a && chip0.ck && chip0.inset && chip0.bold && !chip1.on && !chip1.a && !chip1.ck && !chip1.inset && !chip1.bold && chip1.ink !== chip0.ink &&
+      chip2.on && chip2.a && chip2.ck && chip2.inset && chip2.ink === chip0.ink, { chip0, chip1, chip2 });
+    expect('칩을 모두 풀면(사유 0개) 확정 버튼 비활성', off && n0 === 0, { off, n0 });
     const on = !(await p.isDisabled('#rrOk'));
     await p.click('#rrOk'); await p.waitForTimeout(200);
     const a0 = (await st()).apps[0], fq = await p.evaluate(() => [document.getElementById('dlg').open, document.activeElement.id]);
@@ -1099,9 +1146,9 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   await p.click('#rvSvc [data-f="ar"]'); await p.waitForTimeout(100);
   { const arRow = await p.evaluate(() => [...document.querySelectorAll('#rvQueue tbody tr')].map(r => r.cells[1].textContent + ' ' + r.cells[2].textContent).join(' / '));
     await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.waitForTimeout(150);
-    const pre = await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.map(x => x.value));
-    await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click())); await p.waitForTimeout(80);
-    await p.locator('#dlgBody .reasons label', { hasText: '관련 거래처 우량' }).locator('input').check();
+    const pre = await p.locator('#dlgBody .tk-chips input:checked').evaluateAll(xs => xs.map(x => x.value));
+    for (const r of pre) { await p.locator('#dlgBody label.chip', { hasText: r }).click(); await p.waitForTimeout(60); }  // 입체 칩을 눌러 미리 체크를 풂
+    await p.locator('#dlgBody label.chip', { hasText: '관련 거래처 우량' }).click();
     await p.click('#rrOk'); await p.waitForTimeout(150);
     const a1 = (await st()).apps[1];
     console.log('ar review row:', arRow, '| pre-checked', pre.join(',') || '(없음)', '| after', a1.status, a1.decision.reasons.join(','));
@@ -1135,11 +1182,11 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   await p.click('#rvFeed [data-act="rvFilter"][data-f="all"]'); await p.waitForTimeout(100);
   await p.locator('#rvFeed [data-act="rvCheck"]').first().click(); await p.waitForTimeout(120);
   await p.locator('#rvFeed [data-act="rvActOpen"]').nth(1).click(); await p.waitForTimeout(150);
-  console.log('act sheet:', await p.textContent('#dlgTitle'), '|', (await p.locator('dialog .reasons label').allTextContents()).join(' / '));
+  console.log('act sheet:', await p.textContent('#dlgTitle'), '|', (await p.locator('dialog label.chip').allTextContents()).join(' / '));
   await p.click('#dlgFoot [data-act="rvActSave"]'); await p.waitForTimeout(100);
   console.log('act empty save blocked:', await dlgOpen(), '|', await p.textContent('#toast'));
-  await p.locator('dialog .reasons label', { hasText: '고객 연락' }).locator('input').check();
-  await p.locator('dialog .reasons label', { hasText: '모니터링' }).locator('input').check();
+  await p.locator('dialog label.chip', { hasText: '고객 연락' }).click();
+  await p.locator('dialog label.chip', { hasText: '모니터링' }).click();
   await p.fill('#iaMemo', '대표와 통화, 금요일까지 입금 약속');
   await p.click('#dlgFoot [data-act="rvActSave"]'); await p.waitForTimeout(150);
   console.log('issueLog:', Object.entries((await st()).issueLog).map(([k, v]) => k.split(':')[0] + ' ' + v.status + (v.types ? ' [' + v.types.join(',') + '] ' + v.memo : '')).join(' / '), '| shown', (await p.locator('#rvFeed .tag.ok', { hasText: '조치 기록' }).count()) + ' 조치 · ' + (await p.locator('#rvFeed .tag.mute', { hasText: '확인함' }).count()) + ' 확인', '|', (await p.locator('#rvFeed [data-act="rvFilter"]').allTextContents()).join(' / '));
@@ -1232,6 +1279,195 @@ const BLOCK_FONTS = !!process.env.BLOCK_FONTS;
   await role(); console.log('[부록] reviewer 연체 후 완납:', await rvRow()); await role();
   const d7L = await doc7(); console.log('[부록] doc7 연체 후 완납:', d7L);
   expect('문서 7 미리보기(연체 후 완납): 두 건 모두 넘김 · 남은 0원', d7L.includes('한결푸드 ' + mdAt(73) + ' 넘김 4,400,000') && d7L.includes('그린마켓 ' + mdAt(73) + ' 넘김 11,565,090') && d7L.includes('넘긴 합계 15,965,090원') && d7L.includes('남은 금액 0원') && d7L.includes('연체 후 완납'), d7L);
+
+  // 15-1. 새 거래 시트의 수량 숫자 조절기 (따로 연 창 · 저장하지 않고 닫아 시나리오 숫자에 영향 없음)
+  //       [+]/[−] · ↑↓ · PageUp · 직접 입력 · Home/End · 최소 1([−]만 멈춤, 색 그대로) · 최대 9999(주황 · [+] 멈춤) · 합계 = 수량 × 단가 × 1.1 · 튕김(움직임 줄이기면 없음)
+  for (const motion of ['no-preference', 'reduce']) {
+    const c1 = await newCtx({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, reducedMotion: motion }), q = await c1.newPage();
+    q.on('pageerror', e => errs.push(e.message)); q.on('console', m => { if (m.type() === 'error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
+    await q.goto('file://' + process.argv[2] + '#sales'); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(150);
+    if (await q.evaluate(() => document.getElementById('dlg').open)) { await q.click('#dlgLeft [data-act="close"]'); await q.waitForTimeout(100); }
+    await q.evaluate(() => location.hash = 'sales'); await q.waitForTimeout(120);
+    const n0 = await q.evaluate(() => JSON.parse(localStorage.getItem('flowpoint-test-v6')).sales.length);
+    await q.click('#tbAct'); await q.waitForTimeout(150);
+    const Q = () => q.evaluate(() => { const i = document.getElementById('ntQty'), s = i.closest('.stp');
+      return { v: i.value, dn: s.querySelector('[data-dir="-1"]').getAttribute('aria-disabled'), up: s.querySelector('[data-dir="1"]').getAttribute('aria-disabled'), max: s.classList.contains('is-max'), col: getComputedStyle(i).color,
+        end: s.nextElementSibling.textContent, spring: s.querySelector('.stp-well').classList.contains('rolling'), sum: document.getElementById('ntSum').textContent, name: i.name, form: i.form && i.form.id }; });
+    const sumOf = n => '합계 (부가세 포함) ' + Math.round(n * 12000 * 1.1).toLocaleString('ko-KR') + '원';
+    const M = motion === 'reduce' ? ' (움직임 줄이기)' : '';
+    let A = await Q();
+    if (!M) expect('새 거래 수량 조절기: 처음 빈 칸 · [−] 멈춤 · 이름 qty 그대로 · 합계 안내', A.v === '' && A.dn === 'true' && A.up === 'false' && A.name === 'qty' && A.form === 'saleForm' && A.sum.startsWith('수량과 단가'), A);
+    await q.fill('#saleForm [name="party"]', '그린마켓'); await q.fill('#saleForm [name="item"]', '완제품 A'); await q.fill('#saleForm [name="price"]', '12000');
+    await q.click('#ntQty_up'); await q.waitForTimeout(420); A = await Q();
+    if (!M) expect('[+] 빈 칸 → 1(최소): [−]만 멈춤 · 숫자 색 그대로(주황 아님) · 합계 13,200원', A.v === '1' && A.dn === 'true' && A.up === 'false' && !A.max && A.col !== ORANGE && A.end === '' && A.sum === sumOf(1), A);
+    await q.click('#ntQty_up'); A = await Q();
+    expect('[+] 1 → 2 · 합계 바로 다시 계산 · 튕김 ' + (M ? '없음' + M : '있음'), A.v === '2' && A.dn === 'false' && A.sum === sumOf(2) && A.spring === !M, A);
+    if (M) { await c1.close(); continue; }
+    await q.click('#ntQty_dn'); await q.waitForTimeout(80); A = await Q();
+    expect('[−] 2 → 1 · 합계 다시 계산', A.v === '1' && A.dn === 'true' && A.sum === sumOf(1), A);
+    await q.focus('#ntQty'); await q.keyboard.press('ArrowUp'); await q.keyboard.press('ArrowUp'); await q.keyboard.press('ArrowDown'); A = await Q();
+    expect('키보드 ↑↑↓: 1 → 2 · 합계', A.v === '2' && A.sum === sumOf(2), A);
+    await q.keyboard.press('PageUp'); A = await Q();
+    expect('키보드 PageUp: +10 → 12', A.v === '12' && A.sum === sumOf(12), A);
+    await q.fill('#ntQty', '250'); A = await Q();
+    expect('직접 입력 250 → 합계 3,300,000원', A.v === '250' && A.sum === sumOf(250), A);
+    if (SHOT) { await q.mouse.move(0, 899); await q.waitForTimeout(450); await q.screenshot({ path: SHOT + '/17-newtrade-qty.png' }); }
+    await q.fill('#ntQty', '123456'); A = await Q();
+    expect('직접 입력은 숫자 네 자리까지 (123456 → 1234)', A.v === '1234' && A.sum === sumOf(1234), A);
+    await q.keyboard.press('End'); await q.waitForTimeout(420); A = await Q();
+    expect('End → 9999(최대): 숫자 주황 · [+] 멈춤 · "가장 큰 수량이에요" · 합계 131,986,800원', A.v === '9999' && A.max && A.col === ORANGE && A.up === 'true' && A.dn === 'false' && A.end === '가장 큰 수량이에요' && A.sum === sumOf(9999), A);
+    await q.click('#ntQty_up', { force: true }); await q.waitForTimeout(80); A = await Q();
+    expect('9999에서 [+]를 눌러도 그대로', A.v === '9999' && A.max, A);
+    // 길게 누르기: 450ms 뒤부터 반복(140ms → 6번 뒤 70ms) — 1.2초 누르면 1보다 여러 칸 줄어듦
+    const bx = await q.locator('#ntQty_dn').boundingBox(); await q.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2); await q.mouse.down(); await q.waitForTimeout(1200); await q.mouse.up(); await q.waitForTimeout(200);
+    const held = +(await Q()).v; await q.waitForTimeout(300); A = await Q();
+    expect('[−] 길게 누르기 1.2초: 여러 칸(5~12) 줄고 놓으면 멈춤', 9999 - held >= 5 && 9999 - held <= 12 && +A.v === held && A.dn === 'false' && !A.max, { held, A });
+    // 조절기로 신청 숫자 재현: 대성원료 650개(직접 입력 640 → PageUp +10) = 플로우페이 신청 매입 합계 15,730,000원,
+    //   세진화학 200개(직접 입력 199 → [+]) = 부족 해결 추천 매입 550만원 (단가는 시나리오 매입 그대로, 합계 = 수량 × 단가 × 1.1)
+    { const P = await q.evaluate(() => JSON.parse(localStorage.getItem('flowpoint-test-v6')).purchases), dae = P.find(x => x.party === '대성원료' && x.qty === 650), sej = P.find(x => x.party === '세진화학' && x.qty === 200);
+      const sumW = (n, pr) => '합계 (부가세 포함) ' + Math.round(n * pr * 1.1).toLocaleString('ko-KR') + '원';
+      await q.fill('#saleForm [name="price"]', String(dae.price)); await q.fill('#ntQty', '640'); await q.keyboard.press('PageUp'); const R1 = await Q();
+      await q.fill('#saleForm [name="price"]', String(sej.price)); await q.fill('#ntQty', '199'); await q.click('#ntQty_up'); await q.waitForTimeout(80); const R2 = await Q();
+      console.log('stepper → 신청 숫자:', '대성원료', R1.v + '개 ×', dae.price, '→', R1.sum, '| 세진화학', R2.v + '개 ×', sej.price, '→', R2.sum);
+      expect('조절기로 신청 숫자 재현: 대성원료 640 → PageUp 650개 · 합계 15,730,000원(플로우페이 신청 매입 합계) / 세진화학 199 → [+] 200개 · 5,500,000원(부족 해결 추천 550만원)',
+        R1.v === '650' && R1.sum === sumW(650, dae.price) && R1.sum.includes('15,730,000원') && R2.v === '200' && R2.sum === sumW(200, sej.price) && R2.sum.includes('5,500,000원'), { R1, R2, dae: dae && dae.price, sej: sej && sej.price }); }
+    await q.keyboard.press('Escape'); await q.waitForTimeout(150);
+    expect('저장하지 않고 닫으면 매출 그대로', !(await q.evaluate(() => document.getElementById('dlg').open)) && (await q.evaluate(() => JSON.parse(localStorage.getItem('flowpoint-test-v6')).sales.length)) === n0, n0);
+    await c1.close();
+  }
+
+  // 15-2. 숫자 조절기 Enter = 입력한 값만 확정(시트 제출 안 함) · 다른 신청에 묶인 매출 줄은 고를 수 없음 (따로 연 창 · 시나리오 숫자에 영향 없음)
+  {
+    const c2 = await newCtx({ viewport: { width: 1280, height: 900 } }), q = await c2.newPage();
+    q.on('pageerror', e => errs.push(e.message)); q.on('console', m => { if (m.type() === 'error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
+    await q.goto('file://' + process.argv[2] + '#home'); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(150);
+    const qClose = async () => { if (await q.evaluate(() => document.getElementById('dlg').open)) { await q.click('#dlgLeft [data-act="close"]'); await q.waitForTimeout(100); } };
+    const S2 = () => q.evaluate(() => JSON.parse(localStorage.getItem('flowpoint-test-v6')));
+    const qgo = async h => { await q.evaluate(x => location.hash = x, h); await q.waitForTimeout(120); };
+    await qClose();
+    // (a) 새 거래(거래명세서): 칸에 25 입력 → Enter → 시트 그대로 · 매출 안 늘어남 · 합계는 25개로. 0 입력 → Enter → 1로 확정
+    await qgo('sales'); const nS = (await S2()).sales.length;
+    await q.click('#tbAct'); await q.waitForTimeout(150);
+    await q.fill('#saleForm [name="party"]', '엔터상사'); await q.fill('#saleForm [name="item"]', '시험품'); await q.fill('#saleForm [name="price"]', '10000');
+    await q.fill('#ntQty', '25'); await q.keyboard.press('Enter'); await q.waitForTimeout(150);
+    const e1 = await q.evaluate(() => [document.getElementById('dlg').open, document.getElementById('ntQty').value, document.activeElement.id, document.getElementById('ntSum').textContent]);
+    await q.fill('#ntQty', '0'); await q.keyboard.press('Enter'); await q.waitForTimeout(150);
+    const e2 = await q.evaluate(() => [document.getElementById('dlg').open, document.getElementById('ntQty').value]);
+    const nS2 = (await S2()).sales.length;
+    console.log('stepper Enter (새 거래):', e1, '| 0 →', e2, '| sales', nS, '→', nS2);
+    expect('새 거래 수량 칸 Enter: 25 확정 · 합계 275,000원 · 명세서 발행 안 됨(시트 그대로 · 매출 그대로)', e1[0] && e1[1] === '25' && e1[2] === 'ntQty' && e1[3].includes('275,000원') && nS2 === nS, { e1, nS, nS2 });
+    expect('새 거래 수량 칸 0 + Enter: 범위 안 1로 확정 · 제출 안 됨', e2[0] && e2[1] === '1' && nS2 === nS, e2);
+    await qClose();
+    // (b) 수집함 수정 시트: 수량 칸 Enter → 저장 안 됨(시트 그대로 · 후보 수량 그대로)
+    await qgo('inbox');
+    await q.evaluate(() => document.querySelector('#ibList .ib-open').click()); await q.waitForTimeout(150);
+    await q.evaluate(() => document.querySelector('#dlgBody [data-act="ibEdit"]').click()); await q.waitForTimeout(150);
+    const ib0 = await S2(), cid = await q.evaluate(() => document.querySelector('#dlgFoot [data-act="ibSave"]').dataset.id), qty0 = ib0.inbox.find(c => c.id === cid).qty;
+    await q.fill('#ibe_qty', '7'); await q.keyboard.press('Enter'); await q.waitForTimeout(150);
+    const e3 = await q.evaluate(() => [document.getElementById('dlg').open, !!document.querySelector('#dlgFoot [data-act="ibSave"]'), document.getElementById('ibe_qty').value]), qty1 = (await S2()).inbox.find(c => c.id === cid).qty;
+    console.log('stepper Enter (수집함 수정):', e3, '| qty', qty0, '→', qty1);
+    expect('수집함 수정 수량 칸 Enter: 7 확정 · 저장 안 됨(시트 그대로 · 후보 수량 그대로)', e3[0] && e3[1] && e3[2] === '7' && qty1 === qty0, { e3, qty0, qty1 });
+    await qClose();
+    // (c) 플로우페이 4단계 결제 기간 칸: ↑ 다음 Enter → 60일 그대로 · 신청 안 됨
+    await qgo('orders');
+    const qnx = async () => { await q.click('#dlgFoot [data-act="stepNext"]'); await q.waitForTimeout(150); };
+    await q.locator('#orderRows li', { hasText: '1,573만원' }).locator('[data-act="finance"]').click(); await q.waitForTimeout(150);
+    await qnx();
+    await q.locator('#dlg label.docrow', { hasText: '그린마켓' }).click(); await q.waitForTimeout(150);  // 줄 전체(이름·금액 어디든)가 누를 곳
+    await q.locator('#dlg label.docrow', { hasText: '440만원' }).locator('b.num').click(); await q.waitForTimeout(150);
+    const sel2 = await q.locator('#dlgBody input[id^="lk_"]:checked').count();
+    await qnx();
+    while (await q.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').count()) { await q.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').first().click(); await q.waitForTimeout(120); }
+    await qnx();
+    await q.focus('#tierIn'); await q.keyboard.press('ArrowUp'); await q.waitForTimeout(150); await q.keyboard.press('Enter'); await q.waitForTimeout(200);
+    const e4 = await q.evaluate(() => [document.getElementById('dlg').open, +document.querySelector('#dlg .stepbar').getAttribute('aria-valuenow'), document.getElementById('tierIn').value, document.activeElement.id]), nA = (await S2()).apps.length;
+    console.log('stepper Enter (결제 기간):', e4, '| 묶은 매출', sel2, '| apps', nA);
+    expect('묶을 매출: 이름·금액 어디를 눌러도 그 줄이 골라짐 (2건)', sel2 === 2, sel2);
+    expect('결제 기간 칸 ↑ 다음 Enter: 60일 그대로 · 4단계 그대로 · 신청하기 안 됨', e4[0] && e4[1] === 4 && e4[2] === '60' && e4[3] === 'tierIn' && nA === 0, { e4, nA });
+    // (d) 신청한 뒤 다른 매입의 2단계: 이미 묶인 매출 줄은 사용 불가(회색 점선 칸 · 이유 태그) · 눌러도 안 골라짐
+    await q.click('#dlgFoot [data-act="submitApply"]'); await q.waitForTimeout(150); await qClose();
+    await qgo('orders');
+    await q.evaluate(() => [...document.querySelectorAll('#orderRows [data-act="finance"]')].find(x => x.offsetParent).click()); await q.waitForTimeout(150);
+    await qnx();
+    const offRow = q.locator('#dlg label.docrow:has(input:disabled)').first();
+    const d0 = await offRow.evaluate(l => { const i = l.querySelector('input'), cs = getComputedStyle(i); return { n: document.querySelectorAll('#dlg label.docrow input:disabled').length, why: document.getElementById(i.getAttribute('aria-describedby')).textContent, cur: getComputedStyle(l).cursor, dash: cs.borderTopStyle, txt: l.innerText.replace(/\s+/g, ' ') }; });
+    const sel0 = await q.locator('#dlgBody input[type="checkbox"]:checked').count();
+    await offRow.click({ force: true }); await q.waitForTimeout(120); await offRow.locator('input').click({ force: true }); await q.waitForTimeout(120);
+    const d1 = await offRow.evaluate(l => l.querySelector('input').checked), sel1 = await q.locator('#dlgBody input[type="checkbox"]:checked').count();
+    console.log('linked row:', JSON.stringify(d0), '| after click', d1, '| checked', sel0, '→', sel1);
+    expect('다른 신청에 묶인 매출 줄: 사용 불가(점선 칸 · not-allowed · "다른 신청에 묶인 매출") · 줄·칸을 눌러도 안 골라짐', d0.n >= 2 && d0.why === '다른 신청에 묶인 매출' && d0.cur === 'not-allowed' && d0.dash === 'dashed' && !d1 && sel1 === sel0, { d0, d1, sel0, sel1 });
+    await c2.close();
+  }
+
+  // 15-3. 입체 탭 묶음·필터 칩·날짜 이동 버튼(v9 단계4) — 따로 연 창 · 시나리오 숫자에 영향 없음
+  {
+    const c3 = await newCtx({ viewport: { width: 1280, height: 900 } }), q = await c3.newPage();
+    q.on('pageerror', e => errs.push(e.message)); q.on('console', m => { if (m.type() === 'error' && !NET_ERR.test(m.text())) errs.push(m.text()); });
+    await q.goto('file://' + process.argv[2] + '#home'); await q.evaluate(() => localStorage.clear()); await q.reload(); await q.waitForTimeout(150);
+    const qClose = async () => { if (await q.evaluate(() => document.getElementById('dlg').open)) { await q.evaluate(() => document.querySelector('#dlgLeft [data-act="close"]').click()); await q.waitForTimeout(100); } };
+    const qgo = async h => { await q.evaluate(x => location.hash = x, h); await q.waitForTimeout(120); };
+    await qClose();
+    // (a) 탭 묶음: 고른 칸만 볼록(바깥 그림자) · 나머지 평평, 고른 칸 테두리 / 판 바탕 3:1 이상, 화살표로 고른 칸과 볼록한 칸이 함께 옮겨감
+    const segLook = async sel => { await q.waitForTimeout(200); return q.evaluate(s => {  // 칸 그림자 전환(120ms)이 끝난 뒤
+      const parse = c => c.match(/[\d.]+/g).slice(0, 3).map(Number), lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+      const g = document.querySelector(s), bs = [...g.querySelectorAll(':scope > button')], on = bs.filter(b => b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-selected') === 'true');
+      const outer = b => getComputedStyle(b).boxShadow.split(/,(?![^(]*\))/).some(x => x !== 'none' && !/inset/.test(x));
+      const a = lum(parse(getComputedStyle(on[0]).borderTopColor)), t = lum(parse(getComputedStyle(g).backgroundColor));
+      return { sel: on.map(b => b.textContent.trim()).join(), raised: bs.filter(outer).map(b => b.textContent.trim()).join(), flat: bs.filter(b => !on.includes(b)).every(b => getComputedStyle(b).boxShadow === 'none'), ring: +((Math.max(a, t) + 0.05) / (Math.min(a, t) + 0.05)).toFixed(2), well: /inset/.test(getComputedStyle(g).boxShadow) };
+    }, sel); };
+    await qgo('report'); const r0 = await segLook('#reportBody .rp-tabs');
+    await q.focus('#rpTab-sum'); await q.keyboard.press('ArrowRight'); await q.waitForTimeout(120); const r1 = await segLook('#reportBody .rp-tabs');
+    await qgo('score'); await q.click('#scSeg [data-sc="me"]'); await q.waitForTimeout(80); const s0 = await segLook('#scSeg');
+    await q.focus('#scSeg [data-sc="me"]'); await q.keyboard.press('ArrowRight'); await q.waitForTimeout(120); const s1 = await segLook('#scSeg');
+    console.log('tactile seg:', JSON.stringify({ r0, r1, s0, s1 }));
+    expect('탭 묶음: 고른 칸만 볼록 · 나머지 평평 · 판은 오목 · 고른 칸 테두리 3:1 이상 (자금일보 · 스코어)', [r0, r1, s0, s1].every(x => x.sel === x.raised && x.flat && x.well && x.ring >= 3), { r0, r1, s0, s1 });
+    expect('탭 묶음 화살표: 요약 → 받을 돈 · 우리 회사 → 매출처 (볼록한 칸도 함께)', r0.sel === '요약' && r1.sel === '받을 돈' && s0.sel === '우리 회사' && s1.sel === '매출처', { r0, r1, s0, s1 });
+    // (b) 정책자금 필터 칩: 누르면 aria-pressed가 그 칩만 true · 오목(안쪽 그림자) + ✓, 다시 전체
+    const chips = () => q.evaluate(() => [...document.querySelectorAll('#fdChips button')].map(b => b.dataset.f + ':' + b.getAttribute('aria-pressed') + ':' + (getComputedStyle(b).boxShadow.split(/,(?![^(]*\))/).every(x => /inset/.test(x)) ? 'in' : 'out') + ':' + (getComputedStyle(b.querySelector('.ck')).display !== 'none' ? '✓' : '')).join(' '));
+    await qgo('fund'); const f0 = await chips();
+    await q.click('#fdChips [data-f="융자"]'); await q.waitForTimeout(100); const f1 = await chips(), n1 = await q.locator('#fdList .fund').count();
+    await q.click('#fdChips [data-f="전체"]'); await q.waitForTimeout(100); const f2 = await chips(), n2 = await q.locator('#fdList .fund').count();
+    console.log('fund chips:', f0, '|', f1, '(' + n1 + '건) |', f2, '(' + n2 + '건)');
+    expect('필터 칩: 누른 칩만 aria-pressed true · 오목 + ✓, 나머지 false · 볼록 (융자 → 전체)', f0 === f2 && /^전체:true:in:✓ 융자:false:out: /.test(f0) && /^전체:false:out: 융자:true:in:✓ 보증:false:out:/.test(f1) && n1 < n2, { f0, f1, f2, n1, n2 });
+    // (c) 날짜 이동: +1 · +7 · +30 → dayOffset 1 · 8 · 38, Space를 누르는 동안 눌린(오목) 모양, 뗄 때 이동. 더보기 시트(390)의 +1도 같은 동작
+    const dOff = async () => (await q.evaluate(() => JSON.parse(localStorage.getItem('flowpoint-test-v6')).dayOffset || 0));
+    const look = sel => q.evaluate(s => { const b = document.querySelector(s), cs = getComputedStyle(b); return { inset: /inset/.test(cs.boxShadow) && !cs.boxShadow.split(/,(?![^(]*\))/).some(x => !/inset/.test(x)), tf: cs.transform }; }, sel);
+    await qgo('home'); const shifts = [];
+    for (const n of [1, 7, 30]){
+      const sel = 'footer [data-shift="' + n + '"]';
+      await q.focus(sel); const up0 = await look(sel);
+      await q.keyboard.down(' '); await q.waitForTimeout(60); const dn = await look(sel); const mid = await dOff();
+      await q.keyboard.up(' '); await q.waitForTimeout(150); await qClose(); const up1 = await look(sel);
+      shifts.push({ n, before: up0.inset, pressed: dn.inset && dn.tf !== 'none', offWhileDown: mid, after: await dOff(), released: !up1.inset, label: (await q.textContent('#dayLabel')).trim() });
+    }
+    // Enter는 누르는 순간 이동(기본 동작 그대로). 이동 뒤 승인 창이 열리면 포커스가 창으로 가므로 눌린 표시는 '눌림 또는 포커스가 떠남'으로 확인
+    await q.focus('footer [data-shift="30"]');
+    await q.keyboard.down('Enter'); await q.waitForTimeout(40); const ent = await q.evaluate(() => document.querySelector('footer [data-shift="30"]').classList.contains('is-pressed') || !document.activeElement.matches('[data-shift]')); await q.keyboard.up('Enter'); await q.waitForTimeout(150); await qClose();
+    const afterEnter = await dOff();
+    const rst = await q.evaluate(() => { const b = document.getElementById('resetBtn'), cs = getComputedStyle(b), d = getComputedStyle(document.querySelector('footer [data-shift="1"]')); return { tk: b.classList.contains('tk'), raised: cs.boxShadow !== 'none' && !/^inset/.test(cs.boxShadow), distinct: cs.color !== d.color }; });
+    await q.setViewportSize({ width: 390, height: 844 }); await q.waitForTimeout(120);
+    await q.click('#moreBtn'); await q.waitForTimeout(150);
+    const m0 = await dOff(); await q.click('#moreDlg [data-shift="1"]'); await q.waitForTimeout(150); await qClose(); const m1 = await dOff();
+    console.log('date shift:', JSON.stringify(shifts), '| Enter +30 →', afterEnter, '| reset', JSON.stringify(rst), '| 더보기 +1:', m0, '→', m1);
+    expect('날짜 이동 +1 · +7 · +30: dayOffset 1 · 8 · 38 · 날짜 표시 "(+N일)" · Space 누르는 동안 오목(뗄 때 이동 · 다시 볼록)', shifts.map(s => s.after).join() === '1,8,38' && shifts.every((s, i) => !s.before && s.pressed && s.offWhileDown === [0, 1, 8][i] && s.released && s.label.includes('(+' + s.after + '일)')), shifts);
+    expect('날짜 이동 Enter도 그대로 +30 (68) · 처음부터 다시 = 볼록 버튼 + 다른 글자색 · 더보기 시트 +1 (69)', afterEnter === 68 && ent && rst.tk && rst.raised && rst.distinct && m0 === 68 && m1 === 69, { afterEnter, ent, rst, m0, m1 });
+    // (d) 수집 동의 스위치 이름: 채널마다 다름
+    await q.setViewportSize({ width: 1280, height: 900 }); await qgo('inbox');
+    const swn = await q.evaluate(() => [...document.querySelectorAll('#ibCh [role="switch"]')].map(i => i.getAttribute('aria-label')));
+    const swr = await q.getByRole('switch', { name: '카카오톡 채널 수집 동의', exact: true }).count();
+    console.log('switch names:', swn.join(' / '));
+    expect('수집 동의 스위치 이름이 채널마다 다름 (4개 · 이름으로 찾기)', swn.length === 4 && new Set(swn).size === 4 && swn.every(x => x.endsWith(' 수집 동의')) && swr === 1, { swn, swr });
+    // (e) 수집 동의는 스위치로: 카카오톡 채널 스위치를 마우스로 켜고 Space로 끔 → S.consents · checked · 옆 글자(켜짐/꺼짐)가 함께 바뀜
+    const swSt = () => q.evaluate(() => { const i = document.querySelector('#ibCh [role="switch"][data-consent="kakao"]');
+      return [JSON.parse(localStorage.getItem('flowpoint-test-v6')).consents.kakao, i.checked, i.closest('label.sw').querySelector('.sw-st').textContent]; });
+    const sw = q.getByRole('switch', { name: '카카오톡 채널 수집 동의', exact: true });
+    if (await q.evaluate(() => document.getElementById('moreDlg').open)) { await q.keyboard.press('Escape'); await q.waitForTimeout(150); }  // (c)의 더보기 시트 닫기
+    const w0 = await swSt(); await sw.click(); await q.waitForTimeout(120); const w1 = await swSt();
+    await sw.focus(); await q.keyboard.press(' '); await q.waitForTimeout(120); const w2 = await swSt();
+    console.log('consent switch kakao:', JSON.stringify([w0, w1, w2]));
+    expect('수집 동의 스위치: 누르면 켜짐(S.consents · checked · "켜짐") · Space로 다시 꺼짐', [w0, w1, w2].every(w => !!w[0] === w[1] && w[2] === (w[1] ? '켜짐' : '꺼짐')) && w1[1] === !w0[1] && w2[1] === w0[1], { w0, w1, w2 });
+    await c3.close();
+  }
 
   // 16. 처음부터 다시 → 날짜·역할·기록 초기화
   await p.click('#resetBtn'); await p.waitForTimeout(150); await closePrompt();

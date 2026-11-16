@@ -47,8 +47,20 @@
   --dis-bg:var(--gray-300);--dis-ink:var(--gray-500);
   /* 강조 줄 바탕 (왼쪽 색 막대 대신) */
   --row-sel:var(--primary-25);
-  /* 세그먼트 고른 칸: 흰 칸 + 얇은 테두리(회색 트랙과 3:1 이상) */
-  --seg-on:#ffffff;--seg-ring:var(--gray-600);
+  /* 입체 조작 부품(숫자 조절기·칩·체크·스위치·탭 공통, 부품 견본 v9 승인값): 볼록 면 · 눌림 · 오목 칸(흰색) · 1px 경계(gray-500, 흰 바탕 3:1)
+     끝값 숫자 = warning-800(흰 칸 4.5:1) · 사용 불가 = 회색 바탕 + 점선 · 숫자 튕김 340ms */
+  --tk-face:linear-gradient(180deg,#ffffff 0%,var(--gray-100) 100%);--tk-face-press:var(--gray-200);
+  --tk-edge:var(--gray-500);--tk-ink:var(--gray-800);
+  --tk-raise:0 1px 2px rgba(25,31,40,.12),0 8px 14px -6px rgba(25,31,40,.32),0 18px 30px -14px rgba(25,31,40,.38),inset 0 1px 0 #ffffff;
+  --tk-raise-sm:0 1px 2px rgba(25,31,40,.10),0 4px 8px -3px rgba(25,31,40,.22),inset 0 1px 0 #ffffff;
+  --tk-press:inset 0 2px 5px rgba(25,31,40,.24),inset 0 1px 1px rgba(25,31,40,.12);
+  --tk-well:#ffffff;--tk-well-in:inset 0 3px 6px -2px rgba(25,31,40,.30),inset 0 -1px 0 rgba(255,255,255,.9);
+  --tk-tray:var(--gray-100);--tk-seg-ring:var(--gray-600);
+  --tk-edge-num:var(--warning-800);
+  --tk-on-bg:var(--primary-50);--tk-on-ink:var(--primary-500);--tk-on-edge:var(--primary-500);
+  --tk-dis-ink:var(--gray-500);--tk-dis-bg:var(--gray-100);--tk-danger-ink:var(--danger-700);
+  --tk-knob:linear-gradient(180deg,#ffffff,var(--gray-100));
+  --r-part:14px;--r-well:12px;--spring-ms:340ms;
   /* 글꼴: Pretendard(가변) → 맑은 고딕 → 애플 고딕 */
   --font:"Pretendard Variable",Pretendard,"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",system-ui,sans-serif;
   /* 글자 체계 (276 디자인 시스템: 제목 700·줄 1.35~1.4, 본문 400·줄 1.5). 기존 이름 유지 */
@@ -87,7 +99,15 @@
     --fill-hover:color-mix(in srgb,var(--gray-800),var(--gray-900));--brand-fill-hover:var(--primary-500);--tint-hover:var(--primary-900);--tint-hover-ink:var(--primary-200);
     --dis-bg:var(--gray-700);--dis-ink:var(--gray-500);
     --row-sel:var(--primary-900);
-    --seg-on:var(--gray-700);--seg-ring:var(--gray-400);
+    --tk-face:linear-gradient(180deg,var(--gray-700) 0%,var(--gray-800) 100%);--tk-face-press:#262e39;
+    --tk-edge:var(--gray-600);--tk-ink:var(--gray-50);
+    --tk-raise:0 1px 0 rgba(0,0,0,.4),0 6px 14px -4px rgba(0,0,0,.65),0 14px 26px -12px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.14);
+    --tk-raise-sm:0 1px 0 rgba(0,0,0,.4),0 4px 10px -3px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.14);
+    --tk-press:inset 0 2px 6px rgba(0,0,0,.6),inset 0 1px 1px rgba(0,0,0,.4);
+    --tk-well:#0f1318;--tk-well-in:inset 0 3px 6px -2px rgba(0,0,0,.8),inset 0 -1px 0 rgba(255,255,255,.06);
+    --tk-tray:#0f1318;--tk-seg-ring:var(--gray-500);--tk-edge-num:var(--warning-600);
+    --tk-on-bg:var(--primary-900);--tk-on-ink:var(--primary-200);--tk-on-edge:var(--primary-200);
+    --tk-dis-ink:var(--gray-500);--tk-dis-bg:#1f2630;--tk-danger-ink:var(--danger-100);--tk-knob:linear-gradient(180deg,#ffffff,var(--gray-200));
     color-scheme:dark;
   }
 }
@@ -107,16 +127,24 @@
   --fill-hover:color-mix(in srgb,var(--gray-800),var(--gray-900));--brand-fill-hover:var(--primary-500);--tint-hover:var(--primary-900);--tint-hover-ink:var(--primary-200);
   --dis-bg:var(--gray-700);--dis-ink:var(--gray-500);
   --row-sel:var(--primary-900);
-  --seg-on:var(--gray-700);--seg-ring:var(--gray-400);
+  --tk-face:linear-gradient(180deg,var(--gray-700) 0%,var(--gray-800) 100%);--tk-face-press:#262e39;
+  --tk-edge:var(--gray-600);--tk-ink:var(--gray-50);
+  --tk-raise:0 1px 0 rgba(0,0,0,.4),0 6px 14px -4px rgba(0,0,0,.65),0 14px 26px -12px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.14);
+  --tk-raise-sm:0 1px 0 rgba(0,0,0,.4),0 4px 10px -3px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.14);
+  --tk-press:inset 0 2px 6px rgba(0,0,0,.6),inset 0 1px 1px rgba(0,0,0,.4);
+  --tk-well:#0f1318;--tk-well-in:inset 0 3px 6px -2px rgba(0,0,0,.8),inset 0 -1px 0 rgba(255,255,255,.06);
+  --tk-tray:#0f1318;--tk-seg-ring:var(--gray-500);--tk-edge-num:var(--warning-600);
+  --tk-on-bg:var(--primary-900);--tk-on-ink:var(--primary-200);--tk-on-edge:var(--primary-200);
+  --tk-dis-ink:var(--gray-500);--tk-dis-bg:#1f2630;--tk-danger-ink:var(--danger-100);--tk-knob:linear-gradient(180deg,#ffffff,var(--gray-200));
   color-scheme:dark;
 }
 /* 고대비 설정: 보조 글자와 구분선을 진하게 */
 @media (prefers-contrast: more){
-  :root{--text2:var(--gray-800);--text3:var(--gray-800);--line:var(--gray-500);--line-strong:var(--gray-600)}
+  :root{--text2:var(--gray-800);--text3:var(--gray-800);--line:var(--gray-500);--line-strong:var(--gray-600);--tk-edge:var(--gray-600)}
   @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){--text2:var(--gray-100);--text3:var(--gray-200);--line:var(--gray-500);--line-strong:var(--gray-400)}
+    :root:not([data-theme="light"]){--text2:var(--gray-100);--text3:var(--gray-200);--line:var(--gray-500);--line-strong:var(--gray-400);--tk-edge:var(--gray-400)}
   }
-  :root[data-theme="dark"]{--text2:var(--gray-100);--text3:var(--gray-200);--line:var(--gray-500);--line-strong:var(--gray-400)}
+  :root[data-theme="dark"]{--text2:var(--gray-100);--text3:var(--gray-200);--line:var(--gray-500);--line-strong:var(--gray-400);--tk-edge:var(--gray-400)}
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:border-box}
@@ -154,6 +182,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 button.ceo-req{border:1px solid currentColor}
 .test-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .test-ctl .day{color:var(--text2);font-weight:700}
+/* 날짜 이동 · 처음부터 다시: 볼록 버튼(.tk), 누르면 오목. 처음부터 다시는 빨간 글자로 구분(되돌릴 수 없는 초기화) */
+#resetBtn.tk{color:var(--tk-danger-ink)}
 .toolbar{display:none}
 .tabbar,.seg-trade{display:none}
 @media (min-width: 1024px){
@@ -185,9 +215,10 @@ button.ceo-req{border:1px solid currentColor}
   .tabbar .ic{width:24px;height:24px}
   .tabbar .on{color:var(--brand);font-weight:700}
   .tabbar .nbadge{position:absolute;top:4px;left:calc(50% + 6px);margin:0;min-width:18px;height:18px;line-height:18px;font-size:var(--fs-caption2)}
-  .seg-trade{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;margin:0 0 16px;background:var(--fill);border-radius:var(--r-button)}
-  .seg-trade a{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:6px;color:var(--text2);text-decoration:none;font-size:var(--fs-subhead);font-weight:400}
-  .seg-trade a[aria-current="page"]{background:var(--seg-on);color:var(--text1);font-weight:700;box-shadow:var(--shadow-xs),inset 0 0 0 1px var(--seg-ring)}
+  /* 거래 세그먼트(매입·매출·수집함 링크): 탭 묶음(.seg)과 같은 입체 모양 — 오목한 판 + 지금 화면만 볼록 */
+  .seg-trade{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;margin:0 0 16px;background:var(--tk-tray);border:1px solid var(--tk-edge);border-radius:calc(var(--r-well) + 4px);box-shadow:var(--tk-well-in)}
+  .seg-trade a{display:flex;align-items:center;justify-content:center;min-height:44px;border:1px solid transparent;border-radius:var(--r-well);color:var(--text2);text-decoration:none;font-size:var(--fs-subhead);font-weight:400}
+  .seg-trade a[aria-current="page"]{background:var(--tk-face);border-color:var(--tk-seg-ring);color:var(--text1);font-weight:700;box-shadow:var(--tk-raise-sm)}
 }
 /* 시트 (공통: #dlg · 더보기) — 휴대폰은 아래에서, 넓은 화면은 가운데 카드 */
 dialog.sheet{border:0;padding:0;margin:auto;width:min(560px,calc(100% - 32px));max-width:none;max-height:min(92vh,880px);background:var(--bg);color:var(--ink);border-radius:var(--r-sheet);box-shadow:var(--shadow-lg);overflow:hidden}
@@ -331,7 +362,7 @@ td.r,th.r{text-align:right}
 .sh-body .docrow label.check{align-items:flex-start}
 .sh-body .docrow label.check input{margin-top:2px}
 .sh-body .docrow label .tag{margin-top:4px}
-.sheet .sh-foot>.step-btn{flex:1 1 0;min-width:0;padding:0 12px}
+.sheet .sh-foot>.step-btn{flex:1 1 0;min-width:0;padding:0 12px;overflow-wrap:anywhere}
 .sheet .sh-foot>.step-btn.primary:disabled{background:var(--dis-bg);color:var(--dis-ink)}
 dialog.sheet:has(.stepbar){height:min(92vh,680px)}
 /* 피드백: 짧은 토스트 (휴대폰에서는 탭 바 위) */
@@ -359,11 +390,16 @@ details:not(.menu)>summary{display:flex;align-items:center;min-height:44px;margi
 .sum{background:var(--brand-soft);border-radius:var(--r-card);padding:11px 14px;font-size:var(--fs-subhead);line-height:1.5}
 .subtabs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 18px}
 /* 서비스 선택 카드: 글자색(--c)과 채움색(--cf)을 분리. 선택 = 어두운 채움 + 흰 글자 (라이트·다크 모두 4.5 이상) */
-.subtabs a{--c:var(--tint-ink);--cs:var(--brand-soft);--cf:var(--brand-fill);display:grid;gap:3px;min-height:44px;padding:14px 18px;border-radius:var(--r-card);text-decoration:none;color:var(--c);background:var(--cs);border:2px solid transparent;transition:background .15s,color .15s,border-color .15s}
+.subtabs a{--c:var(--tint-ink);--cs:var(--brand-soft);--cf:var(--brand-fill);display:grid;gap:3px;min-height:44px;padding:14px 18px;border-radius:var(--r-card);text-decoration:none;color:var(--c);background:var(--cs);border:2px solid transparent;transition:background .15s,color .15s,border-color .15s,box-shadow 90ms ease-out,transform 90ms ease-out}
 .subtabs a[data-sub="factoring"]{--c:var(--warning-ink);--cs:var(--warn-soft);--cf:var(--warning-fill)}
 .subtabs a b{font-size:var(--fs-headline);font-weight:700;letter-spacing:-.01em}
 .subtabs a small{font-size:var(--fs-caption1);line-height:var(--lh-caption1);font-weight:400}
-.subtabs a.on{background:var(--cf);color:#ffffff;box-shadow:var(--shadow)}
+/* 좁은 상자 안의 버튼·탭: 단어 단위로 꺾되, 글자를 크게 키워 한 단어도 안 들어가면 그때만 단어 안에서 꺾기 */
+.subtabs a,.subtabs a *,.seg button,button.small,.btn.small{overflow-wrap:anywhere}
+/* 입체(가볍게): 지금 화면이 아닌 카드는 볼록, 지금 화면 카드는 눌린(오목) 채움. 색은 그대로 */
+.subtabs a:not(.on){box-shadow:var(--tk-raise-sm)}
+.subtabs a:not(.on):active{box-shadow:var(--tk-press);transform:translateY(1px)}
+.subtabs a.on{background:var(--cf);color:#ffffff;box-shadow:var(--tk-press);transform:translateY(1px)}
 .subtabs a:not(.on):hover{border-color:var(--c)}
 .sub{display:none} .sub.on{display:block}
 .guide-item{background:var(--fill2);border-radius:var(--r-card);padding:14px 16px;margin-top:12px}
@@ -378,10 +414,12 @@ details:not(.menu)>summary{display:flex;align-items:center;min-height:44px;margi
 .cgrade{font-size:44px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--brand)}
 .mini th,.mini td{padding:8px 6px;font-size:var(--fs-subhead)}
 .mini table{min-width:420px}
-.chips{display:flex;gap:4px 8px;flex-wrap:wrap;margin:0 0 12px}
-.chips button{position:relative;z-index:0;background:transparent;color:var(--text1);font-weight:400;font-size:var(--fs-subhead);line-height:var(--lh-subhead);padding:0 16px;border-radius:var(--r-pill)}
-.chips button.on{color:var(--brand-ink);font-weight:700}
-.chips button.on::before{background:var(--brand-fill)}
+/* 필터 칩(button.tk, aria-pressed): 입체 칩과 같은 모양 — 볼록 → 고르면 오목(눌림) + 파랑 글자 + ✓ */
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:4px 0 6px}
+.chips button.tk{gap:6px;min-height:44px;padding:0 16px;border-radius:var(--r-pill);color:var(--tk-ink);font-weight:400;font-size:var(--fs-subhead);line-height:var(--lh-subhead)}
+.chips button .ck{display:none;flex:none;width:16px;height:16px}
+.chips button.tk[aria-pressed="true"]{background:var(--tk-on-bg);color:var(--tk-on-ink);border-color:var(--tk-on-edge);box-shadow:var(--tk-press);font-weight:700;transform:translateY(1px)}
+.chips button[aria-pressed="true"] .ck{display:block}
 .fund{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;min-height:44px;padding:14px 0;border-top:.5px solid var(--line)}
 .fund:first-child{border-top:0}
 .fund h3{font-size:var(--fs-headline);line-height:var(--lh-headline);font-weight:700;margin:4px 0 2px}
@@ -401,19 +439,11 @@ body:not(.reviewer) .rv-only{display:none}
 .why li{display:flex;justify-content:space-between;gap:10px}
 .why .pts{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .flags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-/* 선택 칩: 보이는 알약은 36px, 누르는 영역은 44px. 체크박스는 칩 전체를 덮는 투명 입력 */
-.reasons{display:flex;gap:4px 8px;flex-wrap:wrap;margin:4px 0 0}
-.reasons label{position:relative;z-index:0;display:inline-flex;align-items:center;min-height:44px;padding:0 14px;font-size:var(--fs-subhead);line-height:var(--lh-subhead);color:var(--text1);font-weight:400;cursor:pointer}
-.reasons label::before,.chips button::before{content:"";position:absolute;inset:4px 0;z-index:-1;border-radius:var(--r-pill);background:var(--fill)}
-.reasons input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
-.reasons label:has(input:checked){color:var(--brand-ink);font-weight:700}
-.reasons label:has(input:checked)::before{background:var(--brand-fill)}
-.reasons label:has(input:focus-visible){outline:2px solid var(--brand);outline-offset:0;border-radius:var(--r-pill)}
 textarea{font:inherit;font-size:var(--fs-body);color:var(--ink);background:var(--fill2);border:1px solid transparent;border-radius:var(--r-input);padding:9px 12px;width:100%;min-height:90px}
 select{font:inherit;font-size:var(--fs-body);color:var(--ink);background:var(--fill2);border:1px solid transparent;border-radius:var(--r-input);padding:9px 12px;width:100%}
 /* ---------- 화면 배치: 결론 한 문장 + 묶음 카드 ---------- */
 [hidden]{display:none !important}
-h1,h2,h3,p{word-break:keep-all;overflow-wrap:break-word}
+body,h1,h2,h3,p{word-break:keep-all;overflow-wrap:break-word}
 .ph{margin:4px 4px 20px}
 .ph-eye{margin:0 0 4px;font-size:var(--fs-footnote);line-height:var(--lh-footnote);color:var(--text2)}
 .ph h1{margin:0}
@@ -456,15 +486,53 @@ h1,h2,h3,p{word-break:keep-all;overflow-wrap:break-word}
 .bignum.sm b{font-size:var(--fs-title1);line-height:var(--lh-title1)}
 .bignum .gr{align-self:center}
 .panel>.acts{margin-top:16px;gap:8px}
-/* 세그먼트 컨트롤 */
-.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;padding:2px;margin:0 0 20px;max-width:420px;background:var(--fill);border-radius:var(--r-button)}
-.seg button{background:none;border-radius:6px;color:var(--text2);font-weight:400;font-size:var(--fs-subhead);line-height:var(--lh-subhead);padding:0 12px}
-.seg button[aria-pressed="true"]{background:var(--seg-on);color:var(--text1);font-weight:700;box-shadow:var(--shadow-xs),inset 0 0 0 1px var(--seg-ring)}
+/* 세그먼트 컨트롤(탭 묶음, 부품 견본 v9 (e)): 오목한 판(1px 경계) 안에 평평한 칸, 고른 칸만 볼록 + 진한 테두리(판과 3:1 이상).
+   aria-pressed(버튼 묶음)·aria-selected(탭) 모두 같은 모양 */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;margin:0 0 20px;max-width:420px;background:var(--tk-tray);border:1px solid var(--tk-edge);border-radius:calc(var(--r-well) + 4px);box-shadow:var(--tk-well-in)}
+.seg button{background:none;border:1px solid transparent;border-radius:var(--r-well);color:var(--text2);font-weight:400;font-size:var(--fs-subhead);line-height:var(--lh-subhead);padding:0 12px;transition:box-shadow 120ms,background-color 120ms}
+.seg button[aria-pressed="true"],.seg button[aria-selected="true"]{background:var(--tk-face);border-color:var(--tk-seg-ring);color:var(--text1);font-weight:700;box-shadow:var(--tk-raise-sm)}
+.seg button:not([aria-pressed="true"]):not([aria-selected="true"]):hover{color:var(--text1)}
 /* 입력: 44px */
 input:not([type="checkbox"]):not([type="radio"]),select{min-height:44px}
 label.check{min-height:44px}
 form.entry{margin-top:4px}
 form.entry input{min-width:0}
+/* 입체 조작 부품 공통: 볼록 버튼(.tk) · 오목 칸(.tk-well). 카드·배경은 평평하게 두고 누르는 부품에만 */
+.tk{appearance:none;border:1px solid var(--tk-edge);background:var(--tk-face);color:var(--tk-ink);box-shadow:var(--tk-raise);border-radius:var(--r-part);transition:box-shadow 90ms ease-out,transform 90ms ease-out,background-color 90ms}
+.tk:active:not([aria-disabled="true"]):not(:disabled),.tk.is-pressed{background:var(--tk-face-press);box-shadow:var(--tk-press);transform:translateY(1px)}
+.tk[aria-disabled="true"],.tk:disabled{background:var(--tk-dis-bg);color:var(--tk-dis-ink);box-shadow:none;border-style:dashed;cursor:not-allowed;transform:none}
+.tk-well{border:1px solid var(--tk-edge);border-radius:var(--r-well);background:var(--tk-well);box-shadow:var(--tk-well-in)}
+.tk-well:has(:focus-visible){outline:2px solid var(--brand);outline-offset:2px}
+/* 숫자 조절기: [−] 오목 칸(직접 입력) [+] · 최대값만 주황 숫자 */
+.fld{display:grid;gap:5px;align-content:start;min-width:0}
+.stp{display:flex;align-items:center;gap:10px}
+.stp .tk{flex:none;width:52px;min-width:52px;height:48px;min-height:48px;padding:0;display:inline-grid;place-items:center}
+.stp .tk svg{width:20px;height:20px;stroke:currentColor;stroke-width:2;stroke-linecap:round;fill:none}
+.stp-well{position:relative;flex:0 1 5.35em;min-width:0;height:48px;overflow:hidden;font-size:24px}
+.stp-well input{width:100%;height:100%;margin:0;padding:0 10px;border:0;border-radius:inherit;background:transparent;text-align:center;font-size:1em;line-height:1;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;color:var(--tk-ink);caret-color:var(--brand);appearance:textfield;-moz-appearance:textfield}
+.stp-well input:focus{background:transparent;border-color:transparent}
+.stp-well input:focus-visible{outline:none}
+.stp-well input::-webkit-inner-spin-button,.stp-well input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.stp-well.has-unit input{padding:0 30px 0 10px}
+.stp-unit{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:15px;line-height:1;color:var(--text2);pointer-events:none}
+.stp-roll{position:absolute;inset:0;pointer-events:none;font-size:1em;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;color:var(--tk-ink)}
+.stp-roll span{position:absolute;inset:0;display:grid;place-items:center;padding:0 10px;will-change:transform}
+.stp-well.has-unit .stp-roll span{padding:0 30px 0 10px}
+.stp.is-max .stp-well input,.stp.is-max .stp-roll{color:var(--tk-edge-num)}
+.stp .stp-well.rolling input{color:transparent}
+.stp-end{display:block;min-height:18px;font-size:var(--fs-caption1);line-height:var(--lh-caption1);font-weight:700;color:var(--tk-edge-num)}
+.stp-sum{margin:0;font-size:var(--fs-subhead);line-height:var(--lh-subhead);color:var(--text2)}
+.stp-sum b{color:var(--text1)}
+.stp-row{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 16px;margin:0 0 8px}
+.stp-row>div{flex:none;max-width:100%}
+.stp-row .stp-well{flex:0 1 4.35em;width:4.35em}
+.stp-calc{margin:2px 0 0;font-size:var(--fs-subhead);line-height:var(--lh-subhead);color:var(--text2)}
+.stp-calc b{color:var(--text1);font-variant-numeric:tabular-nums}
+.stp-calc b.rate{color:var(--tk-on-ink)}
+.stp-calc small{display:block;font-size:var(--fs-footnote);line-height:var(--lh-footnote)}
+/* 새 거래 입력: 2열 칸 + 수량 줄은 한 줄 전체(네 자리가 잘리지 않게) */
+form.entry:has(.stp){grid-template-columns:repeat(2,minmax(0,1fr))}
+form.entry .fld-stp,form.entry .stp-sum{grid-column:1/-1}
 /* 매입·매출 목록: 한 줄 = 업체 · 금액 · 날짜 · 상태 + 지금 할 일 버튼 하나. 줄을 누르면 상세 시트 */
 .tr-ph{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tr-list>li.tr-row{position:relative;isolation:isolate;flex-wrap:wrap;gap:0 12px;padding:0}
@@ -633,7 +701,6 @@ button.pf-name{min-height:44px;padding:0;background:none;color:var(--text1);font
 .ib-msg .alert{font-weight:700}
 .ib-addr{display:block;margin-top:2px;font-size:var(--fs-subhead);color:var(--text1);word-break:normal;overflow-wrap:anywhere}
 .ib-ch .gl-main>b{font-size:var(--fs-body)}
-.ib-ch label.check{flex:none;margin-left:auto;font-size:var(--fs-subhead);white-space:nowrap}
 .ib-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 4px 4px}
 .ib-bar p{flex:1 1 18em;font-size:var(--fs-footnote);line-height:1.5;color:var(--text2)}
 .ib-file{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin:20px 4px 8px;font-size:var(--fs-subhead);line-height:var(--lh-subhead);font-weight:700}
@@ -644,6 +711,10 @@ button.pf-name{min-height:44px;padding:0;background:none;color:var(--text1);font
 .ib-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px;background:var(--surface);border-radius:var(--r-card)}
 .ib-form label{align-content:start}
 .ib-form input,.ib-form select{min-width:0}
+/* 수량 조절기가 들어가는 수정 시트: 2열(휴대폰은 1열)로 네 자리 숫자가 잘리지 않게 */
+.ib-form:has(.stp){grid-template-columns:repeat(2,minmax(0,1fr))}
+.ib-form .stp-sum{grid-column:1/-1}
+@media (max-width: 519px){.ib-form:has(.stp){grid-template-columns:minmax(0,1fr)}}
 .ib-lt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-height:20px}
 .ib-row small .nw{white-space:nowrap}
 .ib-form small{font-size:var(--fs-footnote);line-height:var(--lh-footnote);color:var(--text2)}
@@ -960,7 +1031,9 @@ button.bell{gap:6px;padding:0 10px;color:var(--brand)}
 dialog.more li.more-day>div{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 16px}
 dialog.more .more-dl{flex:1 1 100%;font-size:var(--fs-subhead);line-height:var(--lh-subhead);color:var(--text2)}
 dialog.more .more-dl b{color:var(--text1)}
-dialog.more li.more-day button{flex:1 1 0;width:auto;min-height:44px;padding:0 12px;justify-content:center;background:var(--fill);border-radius:var(--r-button);font-weight:700;font-size:var(--fs-subhead)}
+/* 날짜 이동 버튼: 볼록 버튼(.tk) — 목록 줄 버튼 기본값(배경 없음·모서리 0)을 이겨야 해서 여기서 다시 지정, 누르면 오목 */
+dialog.more li.more-day button.tk{flex:1 1 0;width:auto;min-height:44px;padding:0 12px;justify-content:center;background:var(--tk-face);border-radius:var(--r-part);color:var(--tk-ink);font-weight:700;font-size:var(--fs-subhead)}
+dialog.more li.more-day button.tk:active,dialog.more li.more-day button.tk.is-pressed{background:var(--tk-face-press);box-shadow:var(--tk-press);transform:translateY(1px)}
 /* 홈 한 화면: 숫자 카드 3개 + 오늘 할 일 */
 .hm-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .hm-card{min-width:0;background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow);padding:14px 16px}
@@ -1064,9 +1137,7 @@ table.sf-it{min-width:0;table-layout:fixed;margin-top:0;background:var(--surface
 .led-kv dd{margin:0;word-break:keep-all;overflow-wrap:break-word}
 .led-kv dd.muted{color:var(--text2)}
 @media (min-width: 768px){dialog.hold{width:min(420px,calc(100% - 32px))}}
-.hold-f{margin:0;padding:0;border:0;background:var(--surface);border-radius:var(--r-card);overflow:hidden}
-.hold-f label{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 16px;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--text1);cursor:pointer}
-.hold-f label+label{border-top:.5px solid var(--line)}
+.hold-f{margin:0;padding:4px 0 6px;border:0}
 .hold-m{margin-top:12px;color:var(--text2)}
 .hold-m textarea{font:inherit;font-size:var(--fs-body);color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r-input);padding:9px 12px;width:100%;resize:vertical}
 .hold-m textarea:focus{outline:none;border-color:var(--brand)}
@@ -1085,7 +1156,6 @@ table.sf-it{min-width:0;table-layout:fixed;margin-top:0;background:var(--surface
 .rp-src b{white-space:nowrap;color:var(--text1)} .rp-src b.in{color:var(--in)}
 .rp-day{display:block;white-space:nowrap}
 .seg.rp-tabs{max-width:none;margin:0 0 16px}
-.rp-tabs button[aria-selected="true"]{background:var(--seg-on);color:var(--text1);font-weight:700;box-shadow:var(--shadow-xs),inset 0 0 0 1px var(--seg-ring)}
 .rp-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .rp-card{min-width:0;background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow);padding:14px 16px}
 .rp-card p{margin:0}
@@ -1159,7 +1229,7 @@ button.rp-recon-b{min-height:44px;padding:0;margin:0 0 -8px;background:none;colo
 .cal-wd{padding:4px 0;text-align:center;font-size:var(--fs-footnote);line-height:var(--lh-footnote);color:var(--text2)}
 button.cal-day{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;min-width:0;min-height:56px;padding:6px 2px;background:none;color:var(--text1);font-weight:400;font-size:var(--fs-callout);border-radius:var(--r-button)}
 button.cal-day:hover:not(:disabled){background:var(--fill2);opacity:1}
-button.cal-day[aria-pressed="true"]{background:var(--brand-soft)}
+button.cal-day[aria-pressed="true"]{background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand)}  /* 고른 날: 평평한 칸 그대로, 연한 채움 + 2px 테두리(바탕과 3:1 이상) */
 .cal-n{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 4px;border-radius:999px;font-variant-numeric:tabular-nums}
 .cal-day.today .cal-n{background:var(--brand-fill);color:var(--brand-ink);font-weight:700}
 .cal-mk{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 4px;min-height:8px}
@@ -1226,6 +1296,58 @@ button.itip[aria-expanded="true"]{color:var(--brand-ink)}
 button.itip[aria-expanded="true"]::before{background:var(--brand-fill);border-color:var(--brand-fill)}
 .tip-body{display:block;flex-basis:100%;width:100%;margin:8px 0 0;padding:12px 14px;background:var(--fill2);border-radius:var(--r-button);font-size:var(--fs-subhead);line-height:1.5;font-weight:400;color:var(--text2);text-align:left}
 footer .foot-note{flex:1 1 16em}
+/* 입체 칩 · 체크 칸 · 스위치 (부품 견본 v9 (b)(c)(d)). 실제 체크박스·선택 단추는 그대로 두고 모양만 바꾼다
+   · 칩(label.chip.tk): 볼록 → 고르면 오목(눌림) + 파랑 글자 + ✓. 투명 입력이 칩 전체를 덮어 누르는 영역 44px, 여러 줄로 감김
+   · 체크 칸 줄(label.crow): 줄 전체가 누를 곳, 칸만 오목 흰 칸 → 고르면 파랑 채움 + ✓(선택 단추는 가운데 볼록 점). 사용 불가 = 회색 칸 + 점선
+   · 스위치(label.sw): 오목 판 + 볼록 손잡이, 옆에 켜짐/꺼짐 글자(스크립트가 실제 글자로 바꿈) */
+.tk-chips{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 0;padding:4px 0 6px;border:0;min-width:0}
+label.chip{position:relative;display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:44px;padding:9px 16px;border-radius:var(--r-pill);font-size:var(--fs-subhead);line-height:var(--lh-subhead);font-weight:400;color:var(--tk-ink);cursor:pointer;user-select:none;-webkit-user-select:none}
+label.chip input{position:absolute;inset:0;width:100%;height:100%;min-height:0;margin:0;padding:0;border-radius:inherit;opacity:0;cursor:pointer}
+label.chip .ck{display:none;flex:none;width:16px;height:16px}
+label.chip:has(input:checked){background:var(--tk-on-bg);color:var(--tk-on-ink);border-color:var(--tk-on-edge);box-shadow:var(--tk-press);font-weight:700;transform:translateY(1px)}
+label.chip:has(input:checked) .ck{display:block}
+label.chip:has(input:focus-visible){outline:2px solid var(--brand);outline-offset:2px}
+label.crow{cursor:pointer}
+label.crow input[type="checkbox"],label.crow input[type="radio"]{appearance:none;-webkit-appearance:none;flex:none;display:inline-grid;place-items:center;width:26px;height:26px;min-height:0;margin:0 2px;padding:0;border-radius:8px;border:1px solid var(--tk-edge);background:var(--tk-well);box-shadow:var(--tk-well-in);cursor:pointer;transition:background-color 90ms,box-shadow 90ms}
+label.crow input[type="radio"]{border-radius:50%}
+label.crow input[type="checkbox"]:checked{background:var(--brand-fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/18px no-repeat;border-color:var(--brand-fill);box-shadow:0 1px 2px rgba(25,31,40,.2),inset 0 1px 0 rgba(255,255,255,.25)}
+label.crow input[type="radio"]:checked{border-color:var(--brand-fill)}
+label.crow input[type="radio"]:checked::after{content:"";width:12px;height:12px;border-radius:50%;background:var(--brand-fill);box-shadow:0 1px 2px rgba(25,31,40,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+label.crow input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+label.crow:has(input:checked){background-image:linear-gradient(90deg,var(--tk-on-bg),transparent 70%)}
+label.crow:has(input:disabled){cursor:not-allowed;color:var(--text2)}
+label.crow input:disabled{cursor:not-allowed;background:var(--tk-dis-bg);box-shadow:none;border-style:dashed}
+/* 묶을 매출 · 플로우페이 매입 고르기: 금액까지 한 줄 전체가 누를 곳 */
+label.docrow.crow{grid-template-columns:auto minmax(0,1fr) auto;gap:12px;font-size:var(--fs-subhead);line-height:var(--lh-subhead);color:var(--ink)}
+label.docrow.crow .tag{margin-top:4px}
+label.sw{display:inline-flex;align-items:center;gap:10px;min-height:44px;font-size:var(--fs-subhead);line-height:var(--lh-subhead);color:var(--text1);cursor:pointer;white-space:nowrap}
+.sw-st{min-width:2.2em;font-size:var(--fs-footnote);line-height:var(--lh-footnote);font-weight:700;color:var(--text2);text-align:right}
+label.sw:has(input:checked) .sw-st{color:var(--tk-on-ink)}
+label.sw input[type="checkbox"]{appearance:none;-webkit-appearance:none;position:relative;flex:none;width:56px;height:32px;min-height:0;margin:0;padding:0;border-radius:var(--r-pill);border:1px solid var(--tk-edge);background:var(--tk-well);box-shadow:var(--tk-well-in);cursor:pointer;transition:background-color 160ms}
+label.sw input[type="checkbox"]::after{content:"";position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:var(--tk-knob);box-shadow:0 1px 1px rgba(25,31,40,.2),0 3px 6px -1px rgba(25,31,40,.35),inset 0 1px 0 #fff;border:1px solid var(--gray-400);transition:transform 220ms cubic-bezier(.3,1.4,.5,1)}
+label.sw input[type="checkbox"]:checked{background:var(--brand-fill);border-color:var(--brand-fill);box-shadow:inset 0 2px 4px rgba(0,0,0,.25)}
+label.sw input[type="checkbox"]:checked::after{transform:translateX(24px);border-color:#fff}
+label.sw input:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+/* 수집 채널: 이름 | 스위치. 전달 이메일은 주소가 한 줄에 들어가게 이름·주소를 한 줄 전체로, 아래 줄에 주소 복사 | 스위치. 좁은 화면은 모든 줄의 스위치를 아래 줄 오른쪽으로 */
+.ib-ch>li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:12px}
+.ib-ch .gl-main{grid-column:1}
+.ib-ch label.sw{grid-column:2;grid-row:1;justify-self:end}
+.ib-ch>li:has(.ib-addr) .gl-main{grid-column:1/-1}
+.ib-ch>li:has(.ib-addr) [data-act="ibCopy"]{grid-column:1;grid-row:2;justify-self:start;margin-left:-8px}
+.ib-ch>li:has(.ib-addr) label.sw{grid-row:2}
+@media (max-width: 519px){
+  .ib-ch .gl-main{grid-column:1/-1}
+  .ib-ch label.sw{grid-row:2}
+}
+/* 강제 색상(고대비 테마): 체크 칸·스위치는 운영체제 기본 모양으로, 고른 칩·칸은 강조색 테두리 */
+@media (forced-colors: active){
+  label.crow input[type="checkbox"],label.crow input[type="radio"],label.sw input[type="checkbox"]{appearance:auto;-webkit-appearance:auto;width:22px;height:22px;background:none;box-shadow:none}
+  label.crow input::after,label.sw input::after{content:none}
+  label.chip:has(input:checked){border:2px solid Highlight}
+  /* 탭 묶음·필터 칩·거래 세그먼트·서비스 카드·캘린더 고른 날: 그림자가 사라지므로 고른 칸은 강조색 테두리 */
+  .seg button[aria-pressed="true"],.seg button[aria-selected="true"],.seg-trade a[aria-current="page"],.chips button[aria-pressed="true"],.subtabs a.on{border:2px solid Highlight}
+  button.cal-day[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:-2px}
+}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{transition:none !important;animation:none !important;scroll-behavior:auto !important}}
 </style>
 </head>
@@ -1383,7 +1505,7 @@ footer .foot-note{flex:1 1 16em}
     <div class="it-in it-hero">
       <p class="ir-chip"><span class="ic" data-ic="review"></span>276 내부 · 심사역 전용</p>
       <h1 id="irTop" tabindex="-1">판단은 사람이. <br>근거는 거래가.</h1>
-      <p class="it-sub">고객사가 매일 쓰는 매입·매출 기록이 그대로 심사 자료가 됩니다. 신청부터 집행 후 관리까지 한 화면에서.</p>
+      <p class="it-sub">고객사가 매일 쓰는 매입·매출 기록이 그대로 심사 자료가 됩니다.<br class="br-wide"> 신청부터 집행 후 관리까지 한 화면에서.</p>
       <section class="it-prev ir-q" aria-labelledby="irQH">
         <div class="ir-qhead"><h2 id="irQH"></h2><span id="irQMeta"></span></div>
         <table class="ir-tbl" aria-labelledby="irQH"><thead id="irQHead"></thead><tbody id="irQRows"></tbody></table>
@@ -1392,7 +1514,7 @@ footer .foot-note{flex:1 1 16em}
     <div class="it-band">
       <div class="it-in ir-feats">
         <section aria-labelledby="irRvH"><span class="ic" data-ic="review"></span><h2 id="irRvH" tabindex="-1">심사</h2>
-          <p>승인·반려와 정보 요청을 신청 단위로. 점수 근거와 거래 원본을 나란히 봅니다.</p></section>
+          <p>승인·반려와 정보 요청을 신청 단위로.<br> 점수 근거와 거래 원본을 나란히 봅니다.</p></section>
         <section aria-labelledby="irPostH"><span class="ic" data-ic="score"></span><h2 id="irPostH" tabindex="-1">집행 후 관리</h2>
           <p>고객사 포트폴리오와 이슈 피드로 상환 지연, 거래처 변동을 먼저 알아챕니다.</p></section>
         <section aria-labelledby="irLogH"><span class="ic" data-ic="report"></span><h2 id="irLogH" tabindex="-1">판단 기록</h2>
@@ -1598,7 +1720,7 @@ footer .foot-note{flex:1 1 16em}
     <div class="panel section">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
         <h2 style="margin:0;flex:1 1 12em" class="tip-row">기업 서류함<button type="button" class="itip" aria-expanded="false" aria-controls="tip-vault" aria-label="기업 서류함 설명 보기">i</button><span class="tip-body" id="tip-vault" role="note" hidden>최초 신청 때 올린 서류를 보관해 두고, 다음 신청에서는 유효기간이 지났거나 반려된 서류만 다시 받습니다.</span></h2>
-        <label class="check"><input type="checkbox" id="consent"> 서류 보관·재사용 동의</label>
+        <label class="check crow"><input type="checkbox" id="consent"> 서류 보관·재사용 동의</label>
       </div>
       <details class="fold" id="vaultFold"><summary id="vaultSum">서류 보기</summary>
       <div class="tbl stack" style="margin-top:0"><table>
@@ -1615,10 +1737,10 @@ footer .foot-note{flex:1 1 16em}
     <span class="foot-note">테스트 페이지 · 숫자는 가정값, 공고·서류는 예시 · 외부 연동 예정 · 이 브라우저에만 저장</span>
     <div class="test-ctl" role="group" aria-label="날짜 이동 (테스트)">
       <span>날짜 이동(테스트) <span class="day" id="dayLabel" aria-live="polite"></span></span>
-      <button class="small" type="button" data-shift="1" aria-label="테스트 날짜 하루 뒤로">+1일</button>
-      <button class="small" type="button" data-shift="7" aria-label="테스트 날짜 7일 뒤로">+7일</button>
-      <button class="small" type="button" data-shift="30" aria-label="테스트 날짜 30일 뒤로">+30일</button>
-      <button class="small" id="resetBtn" type="button">처음부터 다시 (시나리오 초기화)</button>
+      <button class="small tk" type="button" data-shift="1" aria-label="테스트 날짜 하루 뒤로">+1일</button>
+      <button class="small tk" type="button" data-shift="7" aria-label="테스트 날짜 7일 뒤로">+7일</button>
+      <button class="small tk" type="button" data-shift="30" aria-label="테스트 날짜 30일 뒤로">+30일</button>
+      <button class="small tk" id="resetBtn" type="button">처음부터 다시 (시나리오 초기화)</button>
     </div>
   </div>
 </footer>
@@ -1650,9 +1772,9 @@ footer .foot-note{flex:1 1 16em}
   <ul>
     <li class="more-day"><div role="group" aria-labelledby="moreDayL">
       <span class="more-dl" id="moreDayL">날짜 이동(테스트) <b id="moreDay" aria-live="polite"></b></span>
-      <button type="button" data-shift="1" aria-label="테스트 날짜 하루 뒤로">+1일</button>
-      <button type="button" data-shift="7" aria-label="테스트 날짜 7일 뒤로">+7일</button>
-      <button type="button" data-shift="30" aria-label="테스트 날짜 30일 뒤로">+30일</button>
+      <button type="button" class="tk" data-shift="1" aria-label="테스트 날짜 하루 뒤로">+1일</button>
+      <button type="button" class="tk" data-shift="7" aria-label="테스트 날짜 7일 뒤로">+7일</button>
+      <button type="button" class="tk" data-shift="30" aria-label="테스트 날짜 30일 뒤로">+30일</button>
     </div></li>
   </ul>
   <ul>
@@ -2306,6 +2428,9 @@ footer .foot-note{flex:1 1 16em}
         '<td>' + (d.choice === 'approve' ? '승인<small>' + esc(ledHow(d)) + '</small>' : '보류<small>' + esc(d.reason) + '</small>') + '</td>' +
         '<td>' + ledTag(d) + '<small>' + esc(ledResTxt(d)) + '</small></td></tr>').join('') + '</tbody></table>';
   }
+  // 입체 칩: 실제 체크박스·선택 단추(투명, 칩 전체를 덮음) + ✓ + 글자. 값·이름·미리 체크는 그대로
+  const CHIP_CK = '<svg class="ck" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const chipHTML = (type, name, v, on, attr) => '<label class="chip tk"><input type="' + type + '" name="' + name + '" value="' + esc(v) + '"' + (on ? ' checked' : '') + (attr || '') + '>' + CHIP_CK + esc(v) + '</label>';
   // 보류 사유 고르기 (부족 해결 시트 위 겹친 시트). 사유 하나 필수, 기타는 메모 필수
   const holdDlg = document.getElementById('holdDlg'), holdBody = document.getElementById('holdBody'), holdOk = document.getElementById('holdOk');
   const HOLD_R = ['다른 자금으로 해결', '매입처와 결제일 조정', '비용 부담', '기타'];
@@ -2314,7 +2439,7 @@ footer .foot-note{flex:1 1 16em}
     const h = sfCand(el.dataset.id); if (!h || !h.c) return toast('부족 상황이 바뀌어 다시 열어 주세요');
     holdFor = h.c.x.id; holdBack = el;
     holdBody.innerHTML = '<p class="sf-sub">' + esc(h.c.x.party + ' ' + man(h.c.amt) + ' ' + (h.c.kind === 'fp' ? '플로우페이' : '먼저 받기')) + ' · 사유 하나 필수</p>' +
-      '<fieldset class="hold-f" aria-labelledby="holdTitle">' + HOLD_R.map((r, i) => '<label><input type="radio" name="holdR" value="' + esc(r) + '"' + (i ? '' : ' required') + '>' + esc(r) + '</label>').join('') + '</fieldset>' +
+      '<fieldset class="hold-f tk-chips" aria-labelledby="holdTitle">' + HOLD_R.map((r, i) => chipHTML('radio', 'holdR', r, false, i ? '' : ' required')).join('') + '</fieldset>' +
       '<label class="hold-m" for="holdMemo">메모 (기타일 때 필수)<textarea id="holdMemo" rows="2" maxlength="200"></textarea></label>';
     holdSync();
     if (typeof holdDlg.showModal === 'function') holdDlg.showModal(); else holdDlg.setAttribute('open', '');
@@ -2561,7 +2686,7 @@ footer .foot-note{flex:1 1 16em}
     const in7 = in7L.reduce((a,e) => a + e.amt, 0), out7 = out7L.reduce((a,e) => a - e.amt, 0);
     const row = (w, label, amt, cls) => '<li><span class="gl-main">' + esc(label) + '<small>' + esc(w) + '</small></span><span class="gl-end num ' + cls + '">' + (amt > 0 ? '+' : '−') + man(Math.abs(amt)) + '</span></li>';
     // 요약: 부족 문구는 홈과 같은 shortfallInfo 표현(시작일 · D-n, 가장 낮은 날)
-    const sum = (sf ? '<b class="alert">부족 ' + esc(sfWhen(sf)) + '</b> · ' + esc(sfLowTxt(sf)) : '30일 동안 부족 없음 · 가장 낮은 날은 ' + esc(md(addDays(minD))) + ' ' + man(bal[minD]) + '이에요.') + ' 30일 뒤 ' + man(bal[30]) + '.';
+    const sum = (sf ? '<b class="alert">부족 ' + esc(sfWhen(sf)) + '</b> · ' + esc(sfLowTxt(sf)) : '30일 동안 부족 없음 · 가장 낮은 날은 ' + esc(md(addDays(minD))) + ' ' + man(bal[minD]) + '이에요.') + '<br> 30일 뒤 ' + man(bal[30]) + '.';
     const rp = riskParties(), consOut = ev.filter(e => e.amt > 0 && e.ref && rp.has((S.sales.find(s => s.id === e.ref) || {}).party));
     const consAmt = consOut.reduce((a, e) => a + e.amt, 0), consFrom = consOut.length ? Math.min(...consOut.map(e => e.day)) : null;
     const consNote = consOut.length ? '보수 최저 ' + man(cons[cMinD]) + ' · 주의 거래처(' + [...new Set(consOut.map(e => (S.sales.find(s => s.id === e.ref) || {}).party))].join(', ') + ') 들어올 돈 ' + man(consAmt) + ' 제외 · ' + md(addDays(consFrom)) + '부터 달라짐'
@@ -2791,15 +2916,138 @@ footer .foot-note{flex:1 1 16em}
     if (!('deliveryDue' in x) && !('note' in x)) return [];
     return [['납품 예정일', x.deliveryDue ? esc(md(x.deliveryDue)) : IB_NEED], ['요구사항', x.note ? esc(x.note) : IB_NEED]];
   }
+  /* ---------- 숫자 조절기 (공통 부품): [−] 오목 칸 [+] ----------
+     stepper({ id, name, labelId, value, min, max | values, unit, dn, up, end, req, desc }) → HTML. 이벤트는 문서에서 한 번에 받는다(시트를 다시 그려도 그대로)
+     · 범위형(min~max, 수량): 누르면 1씩, 길게 누르면 450ms 뒤 140ms 간격 → 6번 뒤 70ms → 20번 뒤 10씩. 칸에 직접 입력 가능
+     · 목록형(values, 결제 기간 30·60·90일): 한 칸씩(길게 눌러도 반복 없음), 읽기 전용 칸
+     · 키: ↑↓ 한 칸, PageUp·PageDown 10(목록형은 한 칸), Home·End 최소·최대. 한 바퀴 돌지 않음
+     · 최대값: 숫자 주황 + [+] 멈춤(aria-disabled). 최소값: [−]만 멈춤(색 그대로)
+     · 값이 바뀌면 칸에 input·change. change로 시트를 다시 그렸으면 같은 id의 새 칸에서 이전 값 → 새 값 튕김을 이어 재생하고 포커스도 같은 id로 */
+  const STP_MINUS = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14"/></svg>', STP_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M12 5v14"/></svg>';
+  const STP_RM = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const QTY_STP = (id, name, value, req) => ({ id, name, labelId: id + '_l', value, min: 1, max: 9999, req, dn: '수량 1 줄이기', up: '수량 1 늘리기', end: '가장 큰 수량이에요' });
+  function stepper(o){
+    const vals = o.values || null, min = vals ? vals[0] : o.min, max = vals ? vals[vals.length - 1] : o.max;
+    const v = o.value == null || o.value === '' || isNaN(o.value) ? null : Number(o.value), atMax = v != null && v >= max;
+    const inp = vals
+      ? '<input id="' + o.id + '" type="text" role="spinbutton" readonly autocomplete="off" aria-labelledby="' + o.labelId + '" aria-valuemin="' + min + '" aria-valuemax="' + max + '" aria-valuenow="' + v + '" aria-valuetext="' + v + (o.unit || '') + '" value="' + v + '">'
+      : '<input id="' + o.id + '"' + (o.name ? ' name="' + o.name + '"' : '') + ' type="number" inputmode="numeric" min="' + min + '" max="' + max + '" step="1" autocomplete="off"' + (o.req ? ' required' : '') + ' value="' + (v == null ? '' : v) + '">';
+    return '<div class="stp' + (atMax ? ' is-max' : '') + '" role="group" aria-labelledby="' + o.labelId + '"' + (o.desc ? ' aria-describedby="' + o.desc + '"' : '') + (vals ? ' data-values="' + vals.join(',') + '"' : '') + ' data-end="' + esc(o.end) + '">' +
+      '<button type="button" class="tk" id="' + o.id + '_dn" data-dir="-1" aria-label="' + esc(o.dn) + '" aria-disabled="' + (v == null || v <= min) + '">' + STP_MINUS + '</button>' +
+      '<span class="stp-well tk-well' + (o.unit ? ' has-unit' : '') + '">' + inp + (o.unit ? '<span class="stp-unit" aria-hidden="true">' + o.unit + '</span>' : '') + '</span>' +
+      '<button type="button" class="tk" id="' + o.id + '_up" data-dir="1" aria-label="' + esc(o.up) + '" aria-disabled="' + atMax + '">' + STP_PLUS + '</button>' +
+      '<span class="vh" aria-live="polite"></span></div><span class="stp-end" aria-hidden="true">' + (atMax ? esc(o.end) : '') + '</span>';
+  }
+  function stpInfo(box){
+    const inp = box.querySelector('input'), vals = box.dataset.values ? box.dataset.values.split(',').map(Number) : null;
+    return { inp, vals, min: vals ? vals[0] : Number(inp.min), max: vals ? vals[vals.length - 1] : Number(inp.max), v: inp.value === '' ? null : Number(inp.value), unit: (box.querySelector('.stp-unit') || {}).textContent || '' };
+  }
+  function stpPaint(box){
+    const s = stpInfo(box), atMax = s.v != null && s.v >= s.max;
+    box.querySelector('[data-dir="-1"]').setAttribute('aria-disabled', String(s.v == null || s.v <= s.min));
+    box.querySelector('[data-dir="1"]').setAttribute('aria-disabled', String(atMax));
+    box.classList.toggle('is-max', atMax);
+    if (s.vals){ s.inp.setAttribute('aria-valuenow', s.v); s.inp.setAttribute('aria-valuetext', s.v + s.unit); }
+    const end = box.nextElementSibling; if (end && end.classList.contains('stp-end')) end.textContent = atMax ? box.dataset.end : '';
+  }
+  // 숫자 칸 튕김: 늘리면 새 숫자가 위에서, 줄이면 아래에서 들어와 살짝 지나쳤다 돌아옴 (340ms, 넘침 18%). 움직임 줄이기면 없음
+  function stpRoll(well, from, to, dir){
+    if (STP_RM.matches || !well.animate || from == null) return;
+    well.querySelectorAll('.stp-roll').forEach(r => r.remove());
+    const r = document.createElement('span'), a = document.createElement('span'), b = document.createElement('span');
+    r.className = 'stp-roll'; r.setAttribute('aria-hidden', 'true'); a.textContent = from; b.textContent = to;
+    r.append(a, b); well.append(r); well.classList.add('rolling');
+    const s = dir > 0 ? 1 : -1, ms = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--spring-ms'), 10) || 340;
+    a.animate([{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(' + (s * 70) + '%)', opacity: 0 }], { duration: ms * .35, easing: 'cubic-bezier(.5,0,.9,.4)', fill: 'forwards' });
+    const an = b.animate([
+      { transform: 'translateY(' + (-s * 100) + '%)', easing: 'cubic-bezier(.2,.6,.35,1)' },
+      { transform: 'translateY(' + (s * 18) + '%)', offset: .45, easing: 'cubic-bezier(.4,0,.4,1)' },
+      { transform: 'translateY(' + (-s * 5) + '%)', offset: .75, easing: 'ease-in-out' },
+      { transform: 'translateY(0)' }], { duration: ms });
+    an.onfinish = an.oncancel = () => { if (r.isConnected){ r.remove(); well.classList.remove('rolling'); } };
+  }
+  // 튕기는 중에 사람이 직접 입력하면 움직임을 바로 끝내 입력한 숫자가 즉시 보이게
+  function stpRollStop(well){ well.querySelectorAll('.stp-roll').forEach(r => r.remove()); well.classList.remove('rolling'); }
+  document.addEventListener('input', e => { const w = e.isTrusted && e.target.closest && e.target.closest('.stp-well'); if (w) stpRollStop(w); }, true);
+  function stpSet(box, nv, anim){
+    const s = stpInfo(box); nv = Math.min(s.max, Math.max(s.min, nv));
+    if (nv === s.v){ stpPaint(box); return false; }
+    const id = s.inp.id, prev = s.v, dir = prev == null || nv > prev ? 1 : -1, foc = box.contains(document.activeElement) ? document.activeElement.id : '';
+    s.inp.value = nv; stpPaint(box);
+    s.inp.dispatchEvent(new Event('input', { bubbles: true })); s.inp.dispatchEvent(new Event('change', { bubbles: true }));
+    let nb = box;
+    if (!box.isConnected){
+      const ni = document.getElementById(id); nb = ni && ni.closest('.stp'); if (!nb) return true;
+      stpPaint(nb);
+      if (foc && document.activeElement.id !== foc){ const f = document.getElementById(foc); if (f) f.focus(); }
+    }
+    if (anim){
+      stpRoll(nb.querySelector('.stp-well'), prev, nv, dir);
+      const live = nb.querySelector('[aria-live]'), t = nv + s.unit + (nv >= s.max ? ', 가장 큰 값' : nv <= s.min ? ', 가장 작은 값' : '');
+      if (live) setTimeout(() => { live.textContent = t; }, nb === box ? 0 : 60);
+    }
+    return true;
+  }
+  function stpStep(box, dir, n){
+    const s = stpInfo(box);
+    if (s.vals){ const i = s.vals.indexOf(s.v) + dir; return i >= 0 && i < s.vals.length ? stpSet(box, s.vals[i], true) : false; }
+    return stpSet(box, (s.v == null ? 0 : s.v) + dir * (n || 1), true);
+  }
+  let stpT = null, stpN = 0;
+  const stpStop = () => { clearTimeout(stpT); stpT = null; stpN = 0; };
+  // 범위형은 누르는 순간 한 칸 + 길게 누르면 반복. 목록형은 click에서(시트를 다시 그려도 누른 버튼에 포커스가 남게)
+  document.addEventListener('pointerdown', e => {
+    const b = e.target.closest && e.target.closest('.stp > .tk');
+    if (!b || e.button !== 0 || b.getAttribute('aria-disabled') === 'true') return;
+    const box = b.closest('.stp'), dir = Number(b.dataset.dir); if (box.dataset.values) return;
+    stpStop(); if (b.setPointerCapture) try { b.setPointerCapture(e.pointerId); } catch (_){ /* 캡처 못 해도 pointerup에서 멈춤 */ }
+    stpStep(box, dir);
+    const rep = () => { stpN++; if (!box.isConnected || !stpStep(box, dir, stpN > 20 ? 10 : 1)) return stpStop(); stpT = setTimeout(rep, stpN > 6 ? 70 : 140); };
+    stpT = setTimeout(rep, 450);
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => document.addEventListener(t, stpStop, true));
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('.stp > .tk'); if (!b || b.getAttribute('aria-disabled') === 'true') return;
+    const box = b.closest('.stp');
+    if (box.dataset.values || e.detail === 0) stpStep(box, Number(b.dataset.dir));  // 키보드 Enter·Space(detail 0)와 목록형
+  });
+  document.addEventListener('keydown', e => {
+    const inp = e.target.closest && e.target.closest('.stp input'); if (!inp) return;
+    // Enter: 입력한 값만 확정(범위 안으로)하고 시트 제출(신청하기 · 저장 · 명세서 발행)은 하지 않음
+    if (e.key === 'Enter'){ if (!e.isComposing){ e.preventDefault(); if (!inp.readOnly) inp.dispatchEvent(new Event('change', { bubbles: true })); } return; }
+    const box = inp.closest('.stp'), s = stpInfo(box), big = s.vals ? 1 : 10;
+    const f = { ArrowUp: () => stpStep(box, 1), ArrowDown: () => stpStep(box, -1), PageUp: () => stpStep(box, 1, big), PageDown: () => stpStep(box, -1, big), Home: () => stpSet(box, s.min, true), End: () => stpSet(box, s.max, true) }[e.key];
+    if (f){ e.preventDefault(); f(); }
+  });
+  // 직접 입력: 숫자만, 최대값 자릿수까지. 칸을 벗어나면(change) 범위 안으로 (비워 두면 그대로 → 필수 확인은 저장할 때)
+  document.addEventListener('input', e => {
+    const inp = e.target, box = inp.closest && inp.closest('.stp'); if (!box || inp.readOnly) return;
+    const s = stpInfo(box), d = inp.value.replace(/\D/g, '').slice(0, String(s.max).length);
+    if (d !== inp.value) inp.value = d;
+    stpPaint(box);
+  });
+  document.addEventListener('change', e => {
+    const inp = e.target, box = inp.closest && inp.closest('.stp'); if (!box || inp.readOnly || inp.value === '') return;
+    const s = stpInfo(box), x = Math.min(s.max, Math.max(s.min, s.v));
+    if (x !== s.v){ inp.value = x; stpPaint(box); inp.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
+  // 새 거래·수집함 수정: 수량·단가가 바뀌면 합계(부가세 포함)를 바로 다시 계산 (거래 합계와 같은 total())
+  function tradeSumTxt(q, pr){ q = Number(q); pr = Number(pr); return q > 0 && pr > 0 ? '합계 (부가세 포함) <b class="num">' + won(total({ qty: q, price: pr })) + '</b>' : '수량과 단가를 넣으면 합계를 바로 계산해요'; }
+  document.addEventListener('input', e => {
+    const t = e.target, f = t.form;
+    if (f && (f.id === 'saleForm' || f.id === 'orderForm') && (t.name === 'qty' || t.name === 'price')){ const o = document.getElementById('ntSum'); if (o) o.innerHTML = tradeSumTxt(f.qty.value, f.price.value); }
+    if (t.id === 'ibe_qty' || t.id === 'ibe_price'){ const o = document.getElementById('ibeSum'); if (o) o.innerHTML = tradeSumTxt(document.getElementById('ibe_qty').value, document.getElementById('ibe_price').value); }
+  });
   // 새 거래: 입력 양식은 "+ 새 거래"를 누를 때만 시트로 연다 (발주서 보내기 · 거래명세서 발행)
   function openNewTrade(k){
     const buy = k === 'buy', fid = buy ? 'orderForm' : 'saleForm';
     openDlg('<h2>' + (buy ? '새 발주서' : '새 거래명세서') + '</h2><form class="entry" id="' + fid + '">' +
       '<label>' + (buy ? '매입처' : '고객사') + '<input name="party" required placeholder="예: ' + (buy ? '대성원료' : '그린마켓') + '"></label>' +
       '<label>품목<input name="item" required placeholder="예: ' + (buy ? '면 원단' : '완제품 A') + '"></label>' +
-      '<label>수량<input name="qty" type="number" min="1" required></label>' +
+      '<div class="fld fld-stp"><label for="ntQty" id="ntQty_l">수량</label>' + stepper(QTY_STP('ntQty', 'qty', null, true)) + '</div>' +
       '<label>단가(원)<input name="price" type="number" min="1" required></label>' +
-      '<label>' + (buy ? '결제일' : '입금 예정일') + '<input name="due" type="date" required value="' + addDays(14) + '"></label></form>' +
+      '<label>' + (buy ? '결제일' : '입금 예정일') + '<input name="due" type="date" required value="' + addDays(14) + '"></label>' +
+      '<p class="stp-sum" id="ntSum" aria-live="polite">' + tradeSumTxt(0, 0) + '</p></form>' +
       '<div class="foot"><button type="button" data-act="close">취소</button><button class="primary" type="submit" form="' + fid + '">' + (buy ? '발주서 보내기' : '명세서 발행') + '</button></div>');
     const f = document.getElementById(fid); if (f) f.party.focus();
   }
@@ -2828,7 +3076,7 @@ footer .foot-note{flex:1 1 16em}
     }
     const C = reconCands(u), rec = C[0] && C[0].name ? C[0] : null, rest = C.filter(c => c !== rec), pick = rec || C[0];
     const line = c => { const d = diff(c.s.due);
-      return '<label><input type="radio" name="rcPick" value="' + c.s.id + '"' + (c === pick ? ' checked' : '') + '><b>' + esc(c.s.party) + ' <span class="num">' + man(total(c.s)) + '</span></b>' + (c === rec ? '<span class="tag">추천</span>' : '<span></span>') +
+      return '<label class="crow"><input type="radio" name="rcPick" value="' + c.s.id + '"' + (c === pick ? ' checked' : '') + '><b>' + esc(c.s.party) + ' <span class="num">' + man(total(c.s)) + '</span></b>' + (c === rec ? '<span class="tag">추천</span>' : '<span></span>') +
         '<small><span class="tag ' + (c.name ? 'ok' : 'mute') + '">' + (c.name ? '이름 · 금액 일치' : '금액만 일치') + '</span>' + (d < 0 ? '<span class="tag bad">연체 ' + (-d) + '일</span>' : esc(md(c.s.due)) + ' 입금 예정') + '</small></label>'; };
     openDlg('<h2>미확인 입금</h2><p class="dt-amt num" id="rcAmt">' + man(u.amt) + '</p>' +
       '<p class="dt-sub tip-row">보낸 사람 ' + esc(u.sender) + ' · ' + esc(md(u.date)) + ' 입금 · 은행(연동 예정)' + infoTip('recon', '은행에는 들어왔지만 장부(입금 확인)에는 아직 없는 돈이에요. 금액이 같은 입금 전 매출을 후보로 보여 주고, 보낸 사람 이름이 거래처 이름과 맞는 매출을 추천해요. 연결하면 그 매출을 오늘 입금 확인으로 처리해 장부 잔고에 더하고, 입금 예정일의 들어올 돈에서는 빠져요(예측에 두 번 잡히지 않음).', '미확인 입금') + '</p>' + kv +
@@ -3045,10 +3293,10 @@ footer .foot-note{flex:1 1 16em}
       '<p class="step-h">점수 주요 이유</p>' + whyHTML(p.why) +
       '<details><summary>산식 전체 보기</summary>' + factorTable(BASE[p.role], p.f, p.v) + '</details>' +
       '<p class="step-h">추가 정보 요청</p><p class="muted" style="font-size:15px">더 자세한 신용 정보는 상대 기업의 동의를 받아 요청합니다. 필요한 항목을 고르세요.</p>' +
-      '<div class="opt">' + items.map((it,i) => '<label class="check"><input type="checkbox" name="rqi" value="' + it + '"' + (i < 2 ? ' checked' : '') + '> ' + it + '</label>').join('') + '</div>' +
+      '<div class="tk-chips" role="group" aria-label="요청할 정보 항목">' + items.map((it,i) => chipHTML('checkbox', 'rqi', it, i < 2)).join('') + '</div>' +
       '<p class="step-h">요청 방식</p><div class="opt">' +
-      '<label class="check"><input type="radio" name="rqm" value="consent" checked> 상대 기업에 동의 요청 링크 보내기 (알림톡·문자·이메일)</label>' +
-      '<label class="check"><input type="radio" name="rqm" value="public"> 동의 없이 공개 정보만 조회 (휴·폐업, 공공 정보)</label></div>' +
+      '<label class="check crow"><input type="radio" name="rqm" value="consent" checked> 상대 기업에 동의 요청 링크 보내기 (알림톡·문자·이메일)</label>' +
+      '<label class="check crow"><input type="radio" name="rqm" value="public"> 동의 없이 공개 정보만 조회 (휴·폐업, 공공 정보)</label></div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px">' +
       '<label>상대 담당자 연락처<input id="rqc" placeholder="휴대폰 번호 또는 이메일"></label>' +
       '<label>요청 사유<select id="rqr"><option>신규 거래 전 확인</option><option>결제 조건 결정</option><option>플로우페이·유동화 신청 검토</option><option>연체 대응</option></select></label></div>' +
@@ -3147,7 +3395,7 @@ footer .foot-note{flex:1 1 16em}
   function fundDue(f){ return addDays(f.d); }
   function renderFund(){
     document.getElementById('fdCond').innerHTML = '제조·도소매 · 업력 6년 · 매출 약 12억원 · 경기' + infoTip('fdCond', esc(S.company) + ' 기준 조건에 맞춰 적합도를 표시합니다.', '적합도 기준');
-    document.getElementById('fdChips').innerHTML = ['전체','융자','보증','지원사업','관심 등록'].map(c => '<button type="button" class="' + (c === fundFilter ? 'on' : '') + '" aria-pressed="' + (c === fundFilter) + '" data-act="fdFilter" data-f="' + c + '">' + c + (c === '관심 등록' ? ' ' + S.fav.length : '') + '</button>').join('');
+    document.getElementById('fdChips').innerHTML = ['전체','융자','보증','지원사업','관심 등록'].map(c => '<button type="button" class="tk" aria-pressed="' + (c === fundFilter) + '" data-act="fdFilter" data-f="' + c + '">' + CHIP_CK + c + (c === '관심 등록' ? ' ' + S.fav.length : '') + '</button>').join('');
     const list = FUNDS.filter(f => fundFilter === '전체' || (fundFilter === '관심 등록' ? S.fav.includes(f.id) : f.type === fundFilter)).sort((a,b) => a.d - b.d);
     document.getElementById('fdList').innerHTML = list.length ? list.map(f => {
       const fav = S.fav.includes(f.id);
@@ -3339,7 +3587,7 @@ footer .foot-note{flex:1 1 16em}
         '<td class="rv-ac"><span class="rv-acts"><button type="button" class="small" data-act="rvReason" data-r="reject" data-id="' + ap.id + '" aria-haspopup="dialog" aria-label="' + nm + ' 반려">반려</button>' +
         '<button type="button" class="small tinted" data-act="rvReason" data-r="approve" data-id="' + ap.id + '" aria-haspopup="dialog" aria-label="' + nm + ' 승인">승인</button></span></td></tr>'; };
     document.getElementById('rvQueue').innerHTML = !q.length
-      ? '<div class="panel rv-empty"><p class="rv-empty-t">심사 대기 0건</p><p class="rv-empty-s">고객사가 플로우페이나 유동화를 신청하면 여기에 쌓여요.</p><button type="button" class="small plain" data-act="rvJump" data-to="pfH">고객사 포트폴리오 보기 ›</button></div>'
+      ? '<div class="panel rv-empty"><p class="rv-empty-t">심사 대기 0건</p><p class="rv-empty-s">고객사가 플로우페이나 유동화를 신청하면<br> 여기에 쌓여요.</p><button type="button" class="small plain" data-act="rvJump" data-to="pfH">고객사 포트폴리오 보기 ›</button></div>'
       : !L.length
       ? '<div class="panel rv-empty"><p class="rv-empty-t">조건에 맞는 신청이 없어요</p><p class="rv-empty-s">심사 대기 ' + q.length + '건 중 ' + (rvSvc === 'all' ? '' : SVC_NAME[rvSvc] + ' · ') + (kw ? '"' + esc(rvQ.trim()) + '" 검색' : '') + ' 결과가 없어요.</p><button type="button" class="small plain" data-act="rvClear">필터 지우기</button></div>'
       : '<div class="rv-tw"><table class="rv-tbl" aria-labelledby="rvQH"><thead><tr><th scope="col">고객사</th><th scope="col">서비스</th><th scope="col" class="r">신청 금액</th><th scope="col" class="r">스코어</th><th scope="col">상태</th><th scope="col"><span class="vh">처리</span></th></tr></thead><tbody>' +
@@ -3366,7 +3614,7 @@ footer .foot-note{flex:1 1 16em}
     const ok = kind === 'approve', pre = rvSuggest(ap, kind);
     openDlg('<h2>' + (ok ? '승인' : '반려') + ' 사유</h2>' +
       '<p class="rr-meta"><b>' + esc(S.company) + '</b> · ' + SVC_NAME[ap.type] + ' · <span class="num">' + man(ap.amount) + '</span></p>' +
-      '<p class="step-h">판단 사유 (하나 이상)</p><div class="reasons" role="group" aria-label="판단 사유">' + REASONS.map(r => '<label><input type="checkbox" name="rr_' + ap.id + '" value="' + r + '"' + (pre.includes(r) ? ' checked' : '') + '>' + r + '</label>').join('') + '</div>' +
+      '<p class="step-h">판단 사유 (하나 이상)</p><div class="tk-chips" role="group" aria-label="판단 사유">' + REASONS.map(r => chipHTML('checkbox', 'rr_' + ap.id, r, pre.includes(r))).join('') + '</div>' +
       '<p class="fine tip-row"><span id="rrHint" data-pre="' + pre.length + '">' + rrHint(pre.length, pre.length) + '</span>' + infoTip('rrPre', RV_SUGGEST_TIP, '미리 고른 사유') + '</p>' +
       '<div class="foot"><button type="button" data-act="close">취소</button><button type="button" id="rrOk" class="' + (ok ? 'primary' : 'danger tinted') + '" data-act="' + (ok ? 'rvApprove' : 'rvReject') + '" data-id="' + ap.id + '" aria-describedby="rrHint"' + (pre.length ? '' : ' disabled') + '>' + (ok ? '승인하기' : '반려하기') + '</button></div>');
   }
@@ -3493,7 +3741,7 @@ footer .foot-note{flex:1 1 16em}
     const g = S.issueLog[key] || {};
     openDlg('<h2>조치 기록</h2><p class="dp-meta"><span class="tag ' + x.sev + '">' + SEV[x.sev] + ' · ' + esc(x.word) + '</span><span>' + esc(x.co) + ' · ' + esc(md(x.date)) + '</span></p>' +
       '<p class="ia-text">' + esc(x.text) + '</p>' +
-      '<p class="step-h">조치 유형 (여러 개 고를 수 있어요)</p><div class="reasons" role="group" aria-label="조치 유형">' + ACT_TYPES.map(t => '<label><input type="checkbox" name="iaType" value="' + t + '"' + ((g.types || []).includes(t) ? ' checked' : '') + '>' + t + '</label>').join('') + '</div>' +
+      '<p class="step-h">조치 유형 (여러 개 고를 수 있어요)</p><div class="tk-chips" role="group" aria-label="조치 유형">' + ACT_TYPES.map(t => chipHTML('checkbox', 'iaType', t, (g.types || []).includes(t))).join('') + '</div>' +
       '<p class="step-h">메모</p><label>무엇을 했는지 적어 주세요<textarea id="iaMemo" placeholder="예: 대표와 통화, 이번 주 금요일까지 입금 약속">' + esc(g.memo || '') + '</textarea></label>' +
       '<div class="foot"><button type="button" data-act="close">취소</button><button class="primary" type="button" data-act="rvActSave" data-key="' + esc(key) + '">기록하기</button></div>');
   }
@@ -3638,11 +3886,11 @@ footer .foot-note{flex:1 1 16em}
         tipLine('ap1', '발주서에서 채움', '발주서에서 자동으로 채웠습니다. 276홀딩스가 매입처에 직접 결제하고, 고객사에 납품액으로 판매합니다.');
     } else if (isBuy && n === 2){
       const el = eligibleSales(), lk = linkedSales();
-      const lkRows = lk.map(x => '<div class="docrow"><label class="check"><input type="checkbox" disabled aria-describedby="lkn_' + x.id + '"> <span>' + esc(x.party) + ' (' + esc(x.item) + ')<small>입금 예정일 ' + esc(md(x.due)) + '</small><span class="tag mute" id="lkn_' + x.id + '">다른 신청에 묶인 매출</span></span></label><b class="num">' + man(total(x)) + '</b></div>').join('');
+      const lkRows = lk.map(x => '<label class="docrow crow"><input type="checkbox" disabled aria-describedby="lkn_' + x.id + '"><span>' + esc(x.party) + ' (' + esc(x.item) + ')<small>입금 예정일 ' + esc(md(x.due)) + '</small><span class="tag mute" id="lkn_' + x.id + '">다른 신청에 묶인 매출</span></span><b class="num">' + man(total(x)) + '</b></label>').join('');
       h = tipLine('ap2', '묶은 매출 대금으로 상환', '묶은 매출 대금이 들어오면 그날 276에 넘겨 상환합니다. 묶은 매출 합계(부가세 포함)가 납품액 합계(마일리지를 쓰면 넘길 금액)보다 많아야 신청할 수 있고, 가장 늦은 입금 예정일에 맞춰 결제 기간(30·60·90일)을 제안합니다. 세금계산서를 발행하지 않은 매출이라 신청하면 거래 상대 확인 요청을 보내고, 확인되면 심사로 넘어갑니다. 발행 기한이 지난 매출은 심사에서 리스크로 표시되고 한도가 줄어듭니다.');
       if (!el.length) h += '<p class="sum" style="background:var(--warn-soft)">신청 가능한 매출이 없습니다. 매출업무에서 거래명세서를 먼저 발행해 주세요.</p>' + lkRows + '<p style="margin-top:8px"><a class="btn" href="#sales" data-act="close">매출업무로 이동</a></p>';
       else {
-        h += el.map(x => '<div class="docrow"><label class="check"><input type="checkbox" id="lk_' + x.id + '"' + (curApply.sel.includes(x.id) ? ' checked' : '') + '> <span>' + esc(x.party) + ' (' + esc(x.item) + ')<small>입금 예정일 ' + esc(md(x.due)) + '</small>' + (taxLate(x) ? '<span class="tag warn">계산서 기한 지남</span>' : '<span class="tag mute">미발행</span>') + '</span></label><b class="num">' + man(total(x)) + '</b></div>').join('') + lkRows;
+        h += el.map(x => '<label class="docrow crow"><input type="checkbox" id="lk_' + x.id + '"' + (curApply.sel.includes(x.id) ? ' checked' : '') + '><span>' + esc(x.party) + ' (' + esc(x.item) + ')<small>입금 예정일 ' + esc(md(x.due)) + '</small>' + (taxLate(x) ? '<span class="tag warn">계산서 기한 지남</span>' : '<span class="tag mute">미발행</span>') + '</span><b class="num">' + man(total(x)) + '</b></label>').join('') + lkRows;
         h += '<p class="step-h">묶은 결과</p>' + coverHTML();
         if (curApply.sel.length) h += rows([['가장 늦은 입금', esc(md(sug.last)) + ' (' + (sug.days > 0 ? '매입 결제일 ' + sug.days + '일 뒤' : '매입 결제일 이전') + ')'],
              ['제안 결제 기간', sug.tier + '일 · 가산율 ' + (TIERS[sug.tier] * 100).toFixed(1) + '%']]);
@@ -3653,9 +3901,9 @@ footer .foot-note{flex:1 1 16em}
     } else if (!isBuy && n === 1){
       h = '<p class="sum">대상 채권: ' + esc(ref.party) + ' (' + esc(ref.item) + '), ' + man(amt) + ', 입금 예정일 ' + esc(md(ref.due)) + '</p>' +
         '<div class="guide-item"><h3 class="tip-row">1. 양도 가능한 채권' + infoTip('arg1', '유동화는 고객사에게 받을 돈(매출채권)을 플로우페이로 넘기는 구조입니다. 고객사와의 계약에 채권 양도를 금지하는 조항이 없어야 하고, 이미 다른 곳에 양도했거나 담보로 제공한 채권이 아니어야 합니다.', '양도 가능한 채권') + '</h3>' +
-        '<label class="check"><input type="checkbox" id="arc1"' + (curApply.arc[0] ? ' checked' : '') + '> 계약상 양도 금지 조항이 없고, 다른 곳에 양도하거나 담보로 제공하지 않은 채권임을 확인합니다.</label></div>' +
+        '<label class="check crow"><input type="checkbox" id="arc1"' + (curApply.arc[0] ? ' checked' : '') + '> 계약상 양도 금지 조항이 없고, 다른 곳에 양도하거나 담보로 제공하지 않은 채권임을 확인합니다.</label></div>' +
         '<div class="guide-item"><h3 class="tip-row">2. 결제 계좌 변경 가능' + infoTip('arg2', '유동화 후에는 고객사가 대금을 당사가 지정한 계좌로 입금해야 합니다. 고객사에 채권 양도 사실을 통지하거나 승낙을 받고, 결제 계좌 변경을 안내할 수 있어야 합니다.', '결제 계좌 변경') + '</h3>' +
-        '<label class="check"><input type="checkbox" id="arc2"' + (curApply.arc[1] ? ' checked' : '') + '> 고객사의 결제 계좌를 당사 지정 계좌로 변경하는 데 협조할 수 있음을 확인합니다.</label></div>';
+        '<label class="check crow"><input type="checkbox" id="arc2"' + (curApply.arc[1] ? ' checked' : '') + '> 고객사의 결제 계좌를 당사 지정 계좌로 변경하는 데 협조할 수 있음을 확인합니다.</label></div>';
       if (!(curApply.arc[0] && curApply.arc[1])) block = '두 항목을 확인해 주세요';
       next = '<button class="primary step-btn" type="button" id="arNext" data-act="arNext"' + (block ? ' disabled' : '') + '>' + (block || '다음') + '</button>';
     } else if (!isBuy && n === 2){
@@ -3675,7 +3923,11 @@ footer .foot-note{flex:1 1 16em}
       const sels = curApply.sel.map(i => S.sales.find(x => x.id === i)).filter(Boolean);
       if (isBuy){
         // 결제 기간: 제안값이 기본, 고객이 바꿀 수 있음. 결제 기간이 가장 늦은 매출 입금일보다 먼저 끝나면 경고
-        h = '<p class="step-h" style="margin-top:0">결제 기간</p><div class="seg" id="tierSeg" role="group" aria-label="결제 기간">' + [30, 60, 90].map(t => '<button type="button" id="tier' + t + '" data-act="tier" data-t="' + t + '" aria-pressed="' + (t === pr.tier) + '">' + t + '일' + (t === sug.tier ? ' (제안)' : '') + '</button>').join('') + '</div>';
+        // 숫자 조절기 30 → 60 → 90일 (끝에서 멈춤, 90일만 주황). 옆에 가산율·납품액, 아래에 제안 기간
+        h = '<p class="step-h" style="margin-top:0" id="tierL">결제 기간</p><div class="stp-row"><div>' +
+          stepper({ id: 'tierIn', labelId: 'tierL', values: [30, 60, 90], value: pr.tier, unit: '일', dn: '결제 기간 30일 줄이기', up: '결제 기간 30일 늘리기', end: '가장 긴 기간이에요', desc: 'tierCalc' }) +
+          '</div><p class="stp-calc" id="tierCalc">가산율 <b class="rate">' + (pr.rate * 100).toFixed(1) + '%</b> · 납품액 <b>' + won(pr.total) + '</b>' +
+          '<small>제안 ' + sug.tier + '일' + (pr.tier === sug.tier ? ' (지금 기간)' : '') + ' · 묶은 매출 입금일 기준</small></p></div>';
         if (sug.last && pr.payDate < sug.last) h += '<p class="sum" style="background:var(--warn-soft)"><b>주의</b> · ' + (sug.over && pr.tier === 90 ? '입금이 90일보다 늦어요' : '매출 입금 전에 기간이 끝나요') + ' · 마지막 입금 ' + esc(md(sug.last)) + '</p>';
         h += '<p class="step-h">매입가와 납품액 <span class="muted" style="font-weight:400">(단위: 원)</span></p><div class="stmt fp-stmt"><table><thead><tr><th>구분</th><th class="r">매입가</th><th class="r">납품액</th></tr></thead><tbody>' +
           '<tr><td>공급가액</td><td class="r num">' + num(pr.buySupply) + '</td><td class="r num">' + num(pr.supply) + '</td></tr>' +
@@ -3722,7 +3974,7 @@ footer .foot-note{flex:1 1 16em}
       '<dl class="kv"><dt>고객사</dt><dd>' + esc(sx.party) + '</dd><dt>품목</dt><dd>' + esc(sx.item) + ' ' + sx.qty.toLocaleString('ko-KR') + '개</dd><dt>금액</dt><dd class="num">' + won(total(sx)) + '</dd><dt>입금 예정일</dt><dd>' + esc(md(sx.due)) + '</dd></dl>' +
       '<p class="step-h">2. 매입 선택</p><p class="muted" style="font-size:15px;margin-bottom:6px">매입업무에서 플로우페이로 결제할 수 있는 발주서입니다. 276이 고른 매입처에 먼저 결제하고, 이 매출 대금이 들어오면 그날 276에 넘겨 상환합니다.</p>';
     if (!el.length) h += '<p class="sum" style="background:var(--warn-soft)">플로우페이로 결제할 수 있는 발주서가 없습니다. 매입업무에서 발주서를 먼저 보내 주세요.</p><div class="foot"><button type="button" data-act="close">닫기</button><a class="btn" href="#orders" data-act="close">매입업무로 이동</a></div>';
-    else h += el.map(p => '<div class="docrow"><label class="check"><input type="radio" name="pk" value="' + p.id + '"> <span>' + esc(p.party) + ' (' + esc(p.item) + ')<small>결제일 ' + esc(md(p.due)) + '</small></span></label><b class="num">' + man(total(p)) + '</b></div>').join('') +
+    else h += el.map(p => '<label class="docrow crow"><input type="radio" name="pk" value="' + p.id + '"><span>' + esc(p.party) + ' (' + esc(p.item) + ')<small>결제일 ' + esc(md(p.due)) + '</small></span><b class="num">' + man(total(p)) + '</b></label>').join('') +
       '<div class="foot"><button type="button" data-act="close">취소</button><button class="primary step-btn" type="button" id="pickNext" data-act="pickNext" data-sid="' + sid + '" disabled>플로우페이로 결제할 매입을 골라 주세요</button></div>';
     openDlg(h);
   }
@@ -3732,7 +3984,7 @@ footer .foot-note{flex:1 1 16em}
     base = base || amt;
     let h = '<p class="step-h">마일리지</p>';
     if (bal <= 0) h += '<p class="note" style="margin-top:0">사용할 마일리지가 없습니다.</p>';
-    else h += '<div class="opt"><label class="check"><input type="checkbox" id="useM"' + (useM ? ' checked' : '') + '> 마일리지 ' + won(Math.min(bal, cap)) + ' 사용 (보유 ' + won(bal) + ')</label></div>';
+    else h += '<div class="opt"><label class="check crow"><input type="checkbox" id="useM"' + (useM ? ' checked' : '') + '> 마일리지 ' + won(Math.min(bal, cap)) + ' 사용 (보유 ' + won(bal) + ')</label></div>';
     h += tipLine('mil' + type, type === 'buy' ? '넘길 금액 ' + won(cap - use) : '먼저 받는 금액 ' + won(amt - cap + use), (bal > 0 ? (type === 'buy' ? '마일리지는 납품액 합계에서 차감하고, 차감 후 금액을 묶은 매출 대금에서 276에 넘깁니다. ' : '마일리지는 할인료에서 차감합니다. ') : '') +
       '집행되면 이용 금액의 ' + (EARN * 100) + '% (' + won(base * EARN) + ')가 다시 적립됩니다.');
     return h;
@@ -4028,7 +4280,7 @@ footer .foot-note{flex:1 1 16em}
       ['share', '휴대폰 공유하기', '공유 → 플로우포인트', '', ''],
     ];
     document.getElementById('ibCh').innerHTML = ch.map(x => '<li><span class="gl-main"><b>' + x[1] + '</b> ' + x[3] + '<small>' + x[2] + '</small></span>' + x[4] +
-      '<label class="check"><input type="checkbox" role="switch" data-consent="' + x[0] + '"' + (S.consents[x[0]] ? ' checked' : '') + '> 수집 동의</label></li>').join('');
+      '<label class="sw"><span>수집 동의</span><span class="sw-st" aria-hidden="true">' + (S.consents[x[0]] ? '켜짐' : '꺼짐') + '</span><input type="checkbox" role="switch" aria-label="' + x[1] + ' 수집 동의" data-consent="' + x[0] + '"' + (S.consents[x[0]] ? ' checked' : '') + '></label></li>').join('');
     // 일괄 동작
     let bar = '';
     if (role === 'staff'){
@@ -4055,10 +4307,12 @@ footer .foot-note{flex:1 1 16em}
       '<small>' + esc(c.fileName) + (c.doneOn ? ' · ' + esc(md(c.doneOn)) : '') + '</small></span><span class="gl-end">' +
       (c.status === 'approved' ? '<span class="tag ok">승인 · ' + (c.type === 'buy' ? '매입' : '매출') + '에 등록</span>' : c.status === 'linked' ? '<span class="tag ok">자동 연결</span>' : '<span class="tag mute">반려</span>') + '</span></li>').join('') + '</ul>' : '';
   }
-  function ibEditField(c, f, input){
+  // forId: 숫자 조절기처럼 버튼이 함께 든 칸은 label로 감싸지 않고 for로 이름만 연결
+  function ibEditField(c, f, input, forId){
     const v = c.flags && c.flags[f];
     const tag = v === 'sample' ? '<span class="tag warn">예시</span>' : v === 'inferred' ? '<span class="tag mute">추정</span>' : v ? '<span class="tag warn">확인 필요</span>' : '';
-    return '<label><span class="ib-lt">' + IB_LABEL[f] + (f === 'due' ? (c.type === 'sale' ? ' (입금 예정일)' : ' (결제일)') : f === 'price' ? ' (원)' : '') + ' ' + tag + '</span>' + input + (c.raw && c.raw[f] ? '<small>원본 값: ' + esc(c.raw[f]) + '</small>' : '') + '</label>';
+    const lt = '<span class="ib-lt">' + IB_LABEL[f] + (f === 'due' ? (c.type === 'sale' ? ' (입금 예정일)' : ' (결제일)') : f === 'price' ? ' (원)' : '') + ' ' + tag + '</span>', raw = c.raw && c.raw[f] ? '<small>원본 값: ' + esc(c.raw[f]) + '</small>' : '';
+    return forId ? '<div class="fld fld-stp"><label for="' + forId + '" id="' + forId + '_l">' + lt + '</label>' + input + raw + '</div>' : '<label>' + lt + input + raw + '</label>';
   }
   function ibOptField(c, f, input){
     return '<label><span class="ib-lt">' + IB_OPT_LABEL[f] + (c[f] ? '' : ' ' + IB_NEED) + '</span>' + input + (c.raw && c.raw[f] ? '<small>원본 값: ' + esc(c.raw[f]) + '</small>' : '') + '</label>';
@@ -4072,9 +4326,10 @@ footer .foot-note{flex:1 1 16em}
       ibEditField(c, 'type', '<select id="ibe_type"><option value=""' + (c.type ? '' : ' selected') + '>고르기</option><option value="buy"' + (c.type === 'buy' ? ' selected' : '') + '>매입 (발주서)</option><option value="sale"' + (c.type === 'sale' ? ' selected' : '') + '>매출 (거래명세서)</option></select>') +
       ibEditField(c, 'party', '<input id="ibe_party" value="' + val(c.party) + '" placeholder="예: 세진화학">') +
       ibEditField(c, 'item', '<input id="ibe_item" value="' + val(c.item) + '" placeholder="예: 염료">') +
-      ibEditField(c, 'qty', '<input id="ibe_qty" type="number" min="1" inputmode="numeric" value="' + val(c.qty) + '">') +
+      ibEditField(c, 'qty', stepper(QTY_STP('ibe_qty', null, c.qty, false)), 'ibe_qty') +
       ibEditField(c, 'price', '<input id="ibe_price" type="number" min="1" inputmode="numeric" value="' + val(c.price) + '">') +
       ibEditField(c, 'due', '<input id="ibe_due" type="date" value="' + val(c.due) + '">') +
+      '<p class="stp-sum" id="ibeSum" aria-live="polite">' + tradeSumTxt(c.qty, c.price) + '</p>' +
       // 발주 선택 칸: 비워 두어도 저장·승인 가능 (거래에 deliveryDue·terms·note로 저장)
       (c.doc ? '' : ibOptField(c, 'deliveryDue', '<input id="ibe_deliveryDue" type="date" value="' + val(c.deliveryDue) + '">') +
         ibOptField(c, 'terms', '<input id="ibe_terms" maxlength="60" value="' + val(c.terms) + '" placeholder="예: 발주 후 30일">') +
@@ -4390,14 +4645,14 @@ footer .foot-note{flex:1 1 16em}
       h += docForm(d, 'poS') + '<div class="lk-acts"><button class="primary" type="button" data-act="lkNext">확인했어요, 서명하러 가기</button></div>';
     } else if (step === 2){
       h += '<div class="panel"><dl class="kv"><dt>발주처</dt><dd>' + HOLD + '</dd><dt>품목</dt><dd>' + esc(d.item) + ' ' + num(d.qty) + '개</dd><dt>발주 금액</dt><dd class="num"><b>' + won(d.buyTotal) + '</b> (부가세 포함)</dd><dt>대금 지급</dt><dd>세금계산서 확인 후</dd></dl>' +
-        '<label class="check"><input type="checkbox" id="lkAgree"' + (lkUi.agree ? ' checked' : '') + '> 발주서 내용(품목·수량·단가·금액)을 확인했고 전자서명에 동의합니다</label>' +
+        '<label class="check crow"><input type="checkbox" id="lkAgree"' + (lkUi.agree ? ' checked' : '') + '> 발주서 내용(품목·수량·단가·금액)을 확인했고 전자서명에 동의합니다</label>' +
         '<p class="fine">' + CH.sign + ' · 서명하면 276홀딩스에 알림톡으로 알려 드립니다 (연동 예정)</p></div>' +
         '<div class="lk-acts"><button type="button" data-act="lkPrev">이전</button><button class="primary" type="button" id="lkSignBtn" data-act="lkSign"' + (lkUi.agree ? '' : ' disabled') + '>' + (lkUi.agree ? '서명하기' : '동의에 체크해 주세요') + '</button></div>';
     } else if (step === 3){
       h += '<p class="sum">서명을 마쳤어요 (' + esc(md(po.at.signed)) + '). 이제 세금계산서를 처리해 주세요. 대금은 세금계산서 확인 후 지급됩니다.</p>' +
         '<div class="panel lk-opts" role="radiogroup" aria-label="세금계산서 처리 방식">' +
-        '<label class="check"><input type="radio" name="lkTax" value="issue"' + (lkUi.tax === 'issue' ? ' checked' : '') + '> <span><b>직접 발행했어요 (정발행)</b><small>홈택스 등에서 276홀딩스 앞으로 ' + won(d.buyTotal) + ' 세금계산서를 발행했어요</small></span></label>' +
-        '<label class="check"><input type="radio" name="lkTax" value="reverse"' + (lkUi.tax === 'reverse' ? ' checked' : '') + '> <span><b>276홀딩스 역발행 요청 승인</b><small>276홀딩스가 작성한 아래 세금계산서를 승인합니다</small></span></label></div>' +
+        '<label class="check crow"><input type="radio" name="lkTax" value="issue"' + (lkUi.tax === 'issue' ? ' checked' : '') + '> <span><b>직접 발행했어요 (정발행)</b><small>홈택스 등에서 276홀딩스 앞으로 ' + won(d.buyTotal) + ' 세금계산서를 발행했어요</small></span></label>' +
+        '<label class="check crow"><input type="radio" name="lkTax" value="reverse"' + (lkUi.tax === 'reverse' ? ' checked' : '') + '> <span><b>276홀딩스 역발행 요청 승인</b><small>276홀딩스가 작성한 아래 세금계산서를 승인합니다</small></span></label></div>' +
         (lkUi.tax === 'reverse' ? '<p class="step-h">역발행 세금계산서</p>' + docForm(d, 'invS', 'reverse') : '') +
         '<p class="fine">' + CH.tax + '</p>' +
         '<div class="lk-acts"><button class="primary" type="button" data-act="lkTaxDo"' + (lkUi.tax ? '' : ' disabled') + '>' + (lkUi.tax === 'reverse' ? '역발행 승인' : lkUi.tax === 'issue' ? '발행 완료로 알리기' : '처리 방식을 골라 주세요') + '</button></div>';
@@ -4447,14 +4702,14 @@ footer .foot-note{flex:1 1 16em}
     openDlg('<h2>납품 확인</h2>' + tipLine('dlvH', '세 가지를 마치면 완료', '받은 물품을 확인하고 아래 세 가지를 마치면 납품 확인이 끝나요. ' + (fa ? '묶은 매출 대금을 입금일 당일 276에 넘겨 납품액을 모두 넘기면 거래가 완료됩니다.' : '결제일에 납품액을 입금하면 거래가 완료됩니다.')) +
       '<p class="step-h">1. 거래명세서 서명</p>' + stmtForm(d, false) +
       '<div class="opt">' + (u.signed ? '<p class="dlv-ok"><span class="tag ok">서명 완료</span> ' + esc(md(u.signed)) + ' · ' + CH.sign + '</p>'
-        : '<label class="check"><input type="checkbox" id="dlvAgree"' + (u.agree ? ' checked' : '') + '> 품목·수량·금액이 맞고 물품을 받았습니다</label>') + '</div>' +
+        : '<label class="check crow"><input type="checkbox" id="dlvAgree"' + (u.agree ? ' checked' : '') + '> 품목·수량·금액이 맞고 물품을 받았습니다</label>') + '</div>' +
       (u.signed ? '' : '<p style="margin:8px 4px 0"><button class="tinted" type="button" id="dlvSignBtn" data-act="dlvSign"' + (u.agree ? '' : ' disabled') + '>' + (u.agree ? '거래명세서에 서명' : '확인에 체크하면 서명할 수 있어요') + '</button></p>') +
       '<p class="step-h">2. 입고 사진 (필수)</p><div class="opt dlv-photo">' + (u.photo ? '<img class="dlv-thumb" src="' + u.photo + '" alt="올린 입고 사진 미리보기"><p class="note" style="margin:0">긴 변 ' + PHOTO_MAX + 'px 이하로 줄여 저장했어요 (' + Math.round(u.photo.length * 0.75 / 1024) + 'KB)</p>' : '<p class="note" style="margin:0">창고에 들어온 물품 사진 1장. 긴 변 ' + PHOTO_MAX + 'px 이하로 줄여 저장합니다.</p>') +
       '<p><button class="' + (u.photo ? '' : 'tinted') + '" type="button" id="dlvPickBtn" data-act="dlvPick">' + (u.photo ? '다른 사진으로 바꾸기' : '사진 올리기') + '</button></p><input type="file" id="dlvPhoto" accept="image/*" hidden></div>' +
       (fa ? '<p class="step-h">3. 넘김 일정 확인</p><dl class="kv">' + fa.alloc.filter(r => plan[r.saleId]).map(r => { const s = S.sales.find(y => y.id === r.saleId); return s ? '<dt>' + esc(s.party) + '</dt><dd>' + esc(md(s.due)) + ' · <span class="num">' + won(plan[s.id]) + '</span>' + (fwdOf(fa, s.id) ? ' <span class="tag ok">넘김 완료</span>' : '') + '</dd>' : ''; }).join('') + '<dt>받는 계좌</dt><dd>' + HOLD + ' 전용 가상계좌 (예시)</dd></dl>' +
-        '<div class="opt"><label class="check"><input type="checkbox" id="dlvPay"' + (u.payOk ? ' checked' : '') + '> 묶은 매출 대금을 입금일 당일 276에 넘기겠습니다</label></div>'
+        '<div class="opt"><label class="check crow"><input type="checkbox" id="dlvPay"' + (u.payOk ? ' checked' : '') + '> 묶은 매출 대금을 입금일 당일 276에 넘기겠습니다</label></div>'
       : '<p class="step-h">3. 입금일 확인</p><dl class="kv"><dt>결제일</dt><dd><b>' + esc(md(d.payDate)) + '</b> (' + esc(when(diff(d.payDate))) + ')</dd><dt>결제할 금액</dt><dd class="num"><b>' + won(d.payAmount) + '</b></dd><dt>입금 계좌</dt><dd>' + HOLD + ' 전용 가상계좌 (예시)</dd></dl>' +
-        '<div class="opt"><label class="check"><input type="checkbox" id="dlvPay"' + (u.payOk ? ' checked' : '') + '> 결제일 ' + esc(md(d.payDate)) + '에 ' + won(d.payAmount) + '을 입금하겠습니다</label></div>') +
+        '<div class="opt"><label class="check crow"><input type="checkbox" id="dlvPay"' + (u.payOk ? ' checked' : '') + '> 결제일 ' + esc(md(d.payDate)) + '에 ' + won(d.payAmount) + '을 입금하겠습니다</label></div>') +
       '<div class="foot"><button type="button" data-act="close">취소</button><button class="primary step-btn" type="button" data-act="dlvSubmit" data-id="' + d.id + '"' + (block ? ' disabled' : '') + '>' + (block || '납품 확인 완료') + '</button></div>');
     if (keep){ body.scrollTop = sc; const f = focusId && document.getElementById(focusId); if (f) f.focus(); }
   }
@@ -4891,7 +5146,6 @@ footer .foot-note{flex:1 1 16em}
       curApply.step = Math.max(1, Math.min(4, curApply.step + (a === 'stepNext' ? 1 : -1)));
       return openApply(curApply.type, curApply.id);
     }
-    if (a === 'tier'){ if (!curApply || curApply.type !== 'buy') return; curApply.tier = Number(el.dataset.t); return openApply('buy', curApply.id); }
     if (a === 'stmt') return openStmt(id);
     if (a === 'fwd') return openFwd(id);
     if (a === 'recon') return openRecon();
@@ -5295,7 +5549,7 @@ footer .foot-note{flex:1 1 16em}
   });
   document.addEventListener('keydown', e => {
     // 신청 시트: Enter = 다음/신청하기 (비활성이면 무시). 버튼·링크·펼침 위에서는 원래 동작을 따른다
-    if (e.key === 'Enter' && dlg.open && !e.isComposing && !e.target.closest('button,a,summary,textarea,select')){
+    if (e.key === 'Enter' && dlg.open && !e.isComposing && !e.target.closest('button,a,summary,textarea,select,.stp')){
       const nb = dlgFoot.querySelector('.step-btn.primary');
       if (nb){ e.preventDefault(); if (!nb.disabled) nb.click(); }
       return;
@@ -5343,14 +5597,9 @@ footer .foot-note{flex:1 1 16em}
     const t = [v.querySelector('[data-act="' + a + '"][data-id="' + id + '"]'), v.querySelector('.tr-open[data-id="' + id + '"]'), v.querySelector('.tr-fold, .ib-open')].find(e => e && e.offsetParent);
     if (t) t.focus();
   }
-  // 결제 기간 세그먼트(30|60|90일): 좌우 화살표 이동 (다시 그린 뒤에도 포커스는 고른 버튼에)
-  dlg.addEventListener('keydown', e => {
-    if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || !e.target.closest('#tierSeg')) return;
-    const bs = [...document.querySelectorAll('#tierSeg [data-t]')], i = bs.indexOf(e.target); if (i < 0) return;
-    e.preventDefault(); const nx = bs[(i + (e.key === 'ArrowRight' ? 1 : bs.length - 1)) % bs.length];
-    nx.focus(); nx.click();
-  });
   dlg.addEventListener('change', e => {
+    // 결제 기간 조절기(30·60·90일): 고른 기간으로 납품액을 다시 계산해 같은 단계를 다시 그림 (포커스·튕김은 조절기가 새 칸에서 이어감)
+    if (e.target.id === 'tierIn' && curApply && curApply.type === 'buy'){ curApply.tier = Number(e.target.value); openApply('buy', curApply.id); return; }
     if (e.target.name === 'pk'){ const nb = document.getElementById('pickNext'); if (nb){ nb.disabled = false; nb.textContent = '다음'; } }
     // 판단 사유 창: 하나도 안 고르면 확정 비활성
     if (e.target.name && e.target.name.indexOf('rr_') === 0){
@@ -5415,6 +5664,7 @@ footer .foot-note{flex:1 1 16em}
   document.getElementById('ibCh').addEventListener('change', e => {
     const k = e.target.dataset.consent; if (!k) return;
     S.consents[k] = e.target.checked; save();
+    const w = e.target.closest('label.sw').querySelector('.sw-st'); if (w) w.textContent = e.target.checked ? '켜짐' : '꺼짐';
     const name = { tax: '세금계산서', email: '전달 이메일', kakao: '카카오톡 채널', share: '휴대폰 공유하기' }[k];
     toast(name + ' 수집에 ' + (e.target.checked ? '동의했습니다' : '동의를 철회했습니다') + (k === 'email' ? '' : ' (연동 예정)'));
   });
@@ -5435,6 +5685,11 @@ footer .foot-note{flex:1 1 16em}
     S.dayOffset = (S.dayOffset || 0) + Number(b.dataset.shift); save(); renderAll(); route();
     toast('테스트 날짜를 ' + md(iso(today0())) + '로 옮겼습니다 (+' + S.dayOffset + '일)' + (rmRun.n ? ' · 알림 ' + rmRun.n + '건 보냄' : '') + (rmRun.issues.length ? ' · 심사 피드로 ' + rmRun.issues.map(x => x.kind === 'fwdLate' ? '넘김 지연' : 'D+1 미입금').join('·') + ' 전달' : '') + (fpRun.some(r => r[1] === 'late') ? ' · 플로우페이 연체 처리' : '') + (fpRun.some(r => r[1] === 'lateRepaid') ? ' · 연체 후 완납' : ''));
   }));
+  // 입체 버튼(날짜 이동 · 처음부터 다시): 키보드 Enter·Space를 누르는 동안에도 눌린(오목) 모양 — 동작은 그대로(click)
+  document.querySelectorAll('[data-shift], #resetBtn').forEach(b => {
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') b.classList.add('is-pressed'); });
+    ['keyup', 'blur'].forEach(t => b.addEventListener(t, () => b.classList.remove('is-pressed')));
+  });
 
   /* ---------- role (고객 대표 · 고객 담당자 · 심사역) ---------- */
   const ROLE_NAME = { ceo: '고객(대표)', staff: '고객(담당자)', reviewer: '심사역' };

@@ -44,7 +44,7 @@ const NET_ERR = /^(Failed to load resource|Failed to decode downloaded font|OTS 
   await p.evaluate(() => location.hash = 'review'); await p.waitForTimeout(150);
   console.log('review   ', await p.evaluate(() => [location.hash, document.querySelectorAll('.pf-tbl tbody tr').length + ' 고객사 (예시 ' + document.querySelectorAll('.pf-tbl tr.pf-ex').length + ')', document.querySelectorAll('#rvFeed .rv-feed li:not(.empty)').length + ' 이슈', '숫자 ' + [...document.querySelectorAll('#rvKpis .rv-kv')].map(x => x.textContent).join('·'), (document.querySelector('#rvQueue .rv-empty-t') || { textContent: document.querySelectorAll('#rvQueue tbody tr').length + '줄' }).textContent].join(' | ')));
   await p.evaluate(() => document.querySelector('#rvFeed [data-act="rvActOpen"]').click()); await p.waitForTimeout(150);
-  console.log('actsheet ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + document.querySelectorAll('dialog .reasons input').length + ' 유형 | 메모 ' + !!document.getElementById('iaMemo')));
+  console.log('actsheet ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + document.querySelectorAll('dialog .tk-chips input').length + ' 유형 | 메모 ' + !!document.getElementById('iaMemo')));
   // 매입·매출 목록: 줄마다 지금 할 일 버튼 0~1개, 줄을 누르면 상세 시트, "+ 새 거래" 시트에서 입력
   await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);
   if (await p.evaluate(() => document.getElementById('dlg').open)) await p.click('#dlgLeft [data-act="close"]');
@@ -60,7 +60,9 @@ const NET_ERR = /^(Failed to load resource|Failed to decode downloaded font|OTS 
   console.log('detail   ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + [...document.querySelectorAll('#dlgBody .dt-acts button')].map(b => b.textContent + (b.classList.contains('primary') ? '*' : '')).join(', ')));
   await p.click('#dlgLeft [data-act="close"]');
   await p.evaluate(() => document.querySelector('#v-sales [data-act="newTrade"]').click()); await p.waitForTimeout(150);
-  await p.fill('#saleForm [name="party"]', '스모크상회'); await p.fill('#saleForm [name="item"]', '시험품'); await p.fill('#saleForm [name="qty"]', '10'); await p.fill('#saleForm [name="price"]', '10000');
+  // 수량은 숫자 조절기: 직접 9를 넣고 [+]로 10 (칸 이름 qty 그대로), 합계는 바로 계산
+  await p.fill('#saleForm [name="party"]', '스모크상회'); await p.fill('#saleForm [name="item"]', '시험품'); await p.fill('#saleForm [name="qty"]', '9'); await p.click('#ntQty_up'); await p.fill('#saleForm [name="price"]', '10000');
+  console.log('qty      ', await p.evaluate(() => document.querySelector('#saleForm [name="qty"]').value + ' | ' + document.getElementById('ntSum').textContent));
   await p.click('#dlgFoot button[type="submit"]'); await p.waitForTimeout(150);
   console.log('newsale  ', await p.evaluate(() => document.getElementById('dlgTitle').textContent + ' | ' + document.querySelectorAll('#saleRows li').length + '줄 | ' + [...document.querySelectorAll('#saleRows li')].some(l => l.textContent.includes('스모크상회'))));
   console.log('errors:', errs.length ? errs : 'none');

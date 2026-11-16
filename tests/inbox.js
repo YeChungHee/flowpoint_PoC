@@ -63,6 +63,20 @@ const csv2 = write('vendor_orders.csv', '매입처\titem\tqty\tunit price\tdue\n
     check(s0.inbox.filter(c => c.party === '오렌지유통').length === 1, '오렌지유통은 수집함에 한 번만 (엑셀 줄 대신 계산서 후보)');
     const rb = await rowBtns();
     check(rb.length === 2 && rb.every(b => b.length === 1 && b[0] === 'ibApprove:승인'), '승인함 줄마다 버튼 하나 "승인": ' + JSON.stringify(rb)); }
+  // 수집 동의 입체 스위치: 줄의 스위치(라벨)를 누르면 S.consents · 접근성 상태(switch checked) · 켜짐/꺼짐 글자(실제 글자)가 함께 바뀜, Space로도
+  { const em = p.locator('#ibCh li', { hasText: '전달 이메일' }), sw = em.locator('input[role="switch"]');
+    const swSt = async () => [(await st()).consents.email, await sw.isChecked(), (await em.locator('.sw-st').textContent()), await em.locator('.sw-st').evaluate(e => getComputedStyle(e, '::before').content + getComputedStyle(e, '::after').content)];
+    const a0 = await swSt();
+    await em.locator('label.sw').click(); await p.waitForTimeout(80); const a1 = await swSt();
+    await sw.focus(); await p.keyboard.press('Space'); await p.waitForTimeout(80); const a2 = await swSt();
+    check(a0.slice(0, 3).join() === 'false,false,꺼짐' && a1.slice(0, 3).join() === 'true,true,켜짐' && a2.slice(0, 3).join() === 'false,false,꺼짐' && a1[3] === 'nonenone',
+      '수집 동의 스위치: 누르면 켜짐(S.consents.email true · checked · "켜짐" 글자), Space로 다시 꺼짐: ' + JSON.stringify([a0, a1, a2]));
+    // 전달 이메일 주소는 넓은 화면·휴대폰 모두 한 줄 (스위치가 넓어져도 주소가 두 줄로 밀리지 않음)
+    const vp = p.viewportSize(), addr = [];
+    for (const w of [vp.width, 390]){ await p.setViewportSize({ width: w, height: vp.height }); await p.waitForTimeout(120);
+      addr.push(await p.evaluate(() => { const a = document.querySelector('#ibCh .ib-addr'); return Math.round(a.getBoundingClientRect().height) + '/' + parseFloat(getComputedStyle(a).lineHeight); })); }
+    await p.setViewportSize(vp); await p.waitForTimeout(120);
+    check(addr.every(x => +x.split('/')[0] <= +x.split('/')[1] + 1), '전달 이메일 주소 한 줄 (' + vp.width + '·390): ' + addr.join(' , ')); }
   await p.reload(); await p.waitForTimeout(200);
   check(!(await dlgOpen()), '같은 날 다시 접속하면 승인 창이 다시 뜨지 않음');
 
@@ -130,6 +144,17 @@ const csv2 = write('vendor_orders.csv', '매입처\titem\tqty\tunit price\tdue\n
   check(await dlgOpen() && (await p.textContent('#dlgTitle')) === '거래 후보 수정', '수정 시트 열림');
   check((await p.textContent('#dlgBody')).includes('원본 값: 많이'), '수정 시트: 읽지 못한 원본 값 표시');
   await shot('v3s3-edit-1280');
+  // 수량 숫자 조절기: 직접 2999 → [+]로 3000, 합계(수량 × 단가 × 1.1)가 바로 바뀜 · 범위 1–9999 · 이름(id) ibe_qty 그대로
+  const ibq = () => p.evaluate(() => { const i = document.getElementById('ibe_qty'), s = i.closest('.stp'), pr = +document.getElementById('ibe_price').value;
+    return { v: i.value, min: i.min, max: i.max, step: i.step, label: i.labels[0] && i.labels[0].textContent.trim(), group: s.getAttribute('role') + ':' + document.getElementById(s.getAttribute('aria-labelledby')).textContent.trim(),
+      dn: s.querySelector('[data-dir="-1"]').getAttribute('aria-disabled'), up: s.querySelector('[data-dir="1"]').getAttribute('aria-disabled'), sum: document.getElementById('ibeSum').textContent,
+      want: pr > 0 && +i.value > 0 ? '합계 (부가세 포함) ' + Math.round(+i.value * pr * 1.1).toLocaleString('ko-KR') + '원' : null }; });
+  await p.fill('#ibe_qty', '2999'); let q0 = await ibq();
+  await p.click('#ibe_qty_up'); let q1 = await ibq();
+  check(q0.v === '2999' && q1.v === '3000' && q0.min === '1' && q0.max === '9999' && q0.step === '1' && /^수량/.test(q0.label) && /^group:수량/.test(q0.group) && q1.dn === 'false' && q1.up === 'false' && q1.want && q1.sum === q1.want && q0.sum === q0.want,
+    '수정 시트 수량 조절기: 직접 입력 2999 → [+] 3000 · 합계 바로 다시 계산 (' + q1.sum + ')');
+  await p.focus('#ibe_qty'); await p.keyboard.press('End'); q0 = await ibq(); await p.keyboard.press('Home'); q1 = await ibq();
+  check(q0.v === '9999' && q0.up === 'true' && q1.v === '1' && q1.dn === 'true' && q1.sum === q1.want, '수정 시트 수량 End → 9999([+] 멈춤) · Home → 1([−] 멈춤)');
   await p.fill('#ibe_qty', '3000');
   await p.click('#dlgFoot [data-act="ibSave"]'); await p.waitForTimeout(150);
   check(await dlgOpen(), '날짜가 비어 있으면 저장되지 않음');

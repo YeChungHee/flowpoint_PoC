@@ -18,9 +18,13 @@ const NET_ERR = /^(Failed to load resource|Failed to decode downloaded font|OTS 
 // 'dealdetail'은 #deals에서 거래 하나를 연 상태(좁은 화면은 상세만), 'link'는 매입처 외부용 화면(#link/<token>, 1단계 발주서 열람)
 // 'intro'는 고객 소개 페이지(첫 화면 · 사이드바·탭 바 없음, 자금일보 카드 막대 차트 포함)
 // 'intro-review'는 심사역 소개 페이지(새 기록: 미리보기는 고객사 포트폴리오 줄), 'intro-review-q'는 심사 대기 1건이 있을 때(미리보기는 심사 대기 줄)
+// 'newtrade-max'는 "+ 새 거래" 시트의 수량 조절기를 최대 9999(주황 숫자 · [+] 멈춤)로 둔 상태, 'apply-tier'는 플로우페이 신청 4단계의 결제 기간 조절기를 90일(최대 · 주황)로 둔 상태
 // 'review'는 심사 대기 1건(목록 표 · 이슈 피드), 'review-empty'는 새 시나리오의 심사 대기 0건 빈 상태, 'rvdetail'은 목록 줄을 눌러 연 상세 시트(AI 검토 보고서), 'rvreason'은 줄의 승인으로 연 판단 사유 창
-const HASHES = ['intro', 'intro-review', 'intro-review-q', 'home', 'inbox', 'report', 'report-ar', 'report-ap', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'review-empty', 'rvdetail', 'rvreason', 'company', 'deals', 'dealdetail', 'link', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet', 'report-linked', 'score-ledger'];
-const SHEETS = ['rvdetail', 'rvreason', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet'];
+const HASHES = ['intro', 'intro-review', 'intro-review-q', 'home', 'inbox', 'report', 'report-ar', 'report-ap', 'orders', 'sales', 'score', 'fund', 'flowpay', 'factoring', 'review', 'review-empty', 'rvdetail', 'rvreason', 'company', 'deals', 'dealdetail', 'link', 'link-sign', 'link-tax', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'calendar', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'newtrade-max', 'apply-tier', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet', 'report-linked', 'score-ledger', 'apply-link', 'apply-ar', 'pick', 'scorereq'];
+const SHEETS = ['rvdetail', 'rvreason', 'prompt', 'ibdetail', 'ibedit', 'docprev', 'delivery', 'notif', 'thanks', 'actsheet', 'saledetail', 'newtrade', 'newtrade-max', 'apply-tier', 'fwdsheet', 'shortsheet', 'shortsheet-hold', 'reconsheet', 'apply-link', 'apply-ar', 'pick', 'scorereq'];
+// v9 단계3 입체 칩·체크 칸·스위치가 있는 화면: rvreason·shortsheet-hold·actsheet·company(정보 요청 칩) = 칩, reconsheet·delivery·apply-tier(마일리지)·flowpay·factoring(서류 보관 동의) = 체크 칸,
+// 'scorereq'(기업 리포트 → 추가 정보 요청: 요청 항목 칩 · 요청 방식 선택 칸), 'apply-link'(플로우페이 2단계 묶을 매출 · 다른 신청에 묶인 줄), 'apply-ar'(유동화 1단계 확인 두 항목), 'pick'(매출에서 플로우페이 매입 고르기), 'link-sign'·'link-tax'(매입처 링크 서명 동의 · 세금계산서 방식) = 체크 칸, inbox = 스위치
+const STEPPER_SHEETS = ['newtrade', 'newtrade-max', 'ibedit', 'apply-tier'];  // 숫자 조절기가 있는 시트
 const SIZES = { 1280: 800, 820: 1180, 390: 844 };
 
 // 알고 있는 예외 (실패로 세지 않고 이유와 함께 따로 보여 준다). key는 "점검|선택자" 앞부분과 비교
@@ -218,6 +222,115 @@ const SPILL = () => {
   return out;
 };
 
+// 숫자 조절기(시트 안 .stp): 이름·값(role=group + 이름, 칸 이름, 범위형 min·max·step / 목록형 aria-value*), 버튼 이름 · aria-disabled,
+// 끝값(최대 → [+] 멈춤 + 주황 / 최소 → [−]만 멈춤, 주황 아님), 칸 숫자 대비 4.5:1(입력 칸 값은 글자 대비 점검에 안 잡혀 따로), 버튼·칸 경계 3:1, 최대값 자릿수가 칸에 다 들어감
+const STEPPER = colors => {
+  const parse = c => { const m = c.match(/^rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+  const over = (t, b) => { const a = t[3]; return [t[0] * a + b[0] * (1 - a), t[1] * a + b[1] * (1 - a), t[2] * a + b[2] * (1 - a), 1]; };
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const bgOf = el => { const L = []; for (let n = el; n; n = n.parentElement){ const c = parse(getComputedStyle(n).backgroundColor); if (c && c[3] > 0){ L.push(c); if (c[3] >= 1) break; } } let base = [255, 255, 255, 1]; for (let i = L.length - 1; i >= 0; i--) base = over(L[i], base); return base; };
+  const txt = id => { const e = id && document.getElementById(id); return e ? e.textContent.trim() : ''; };
+  const out = []; let n = 0;
+  for (const box of document.querySelectorAll('dialog[open] .stp')){
+    n++;
+    const inp = box.querySelector('input'), well = box.querySelector('.stp-well'), [dn, up] = box.querySelectorAll(':scope > button'), k = '#' + inp.id;
+    const vals = box.dataset.values ? box.dataset.values.split(',').map(Number) : null, min = vals ? vals[0] : +inp.min, max = vals ? vals[vals.length - 1] : +inp.max, v = inp.value === '' ? null : +inp.value;
+    if (box.getAttribute('role') !== 'group' || !txt(box.getAttribute('aria-labelledby'))) out.push({ key: k + ' group', msg: 'role=group + 이름이 없음' });
+    if (!((inp.labels && inp.labels[0] && inp.labels[0].textContent.trim()) || txt(inp.getAttribute('aria-labelledby')))) out.push({ key: k + ' name', msg: '숫자 칸 이름이 없음' });
+    if (vals ? inp.getAttribute('role') !== 'spinbutton' || inp.getAttribute('aria-valuemin') !== String(min) || inp.getAttribute('aria-valuemax') !== String(max) || inp.getAttribute('aria-valuenow') !== inp.value || !inp.getAttribute('aria-valuetext')
+      : inp.type !== 'number' || inp.min !== '1' || inp.max !== '9999' || inp.step !== '1') out.push({ key: k + ' value', msg: '값 정보(min·max·step 또는 aria-value*)가 맞지 않음' });
+    for (const b of [dn, up]) if (!b.getAttribute('aria-label') || !/^(true|false)$/.test(b.getAttribute('aria-disabled') || '')) out.push({ key: k + ' ' + b.id, msg: '버튼 이름·aria-disabled 없음' });
+    const atMax = v != null && v >= max;
+    if ((up.getAttribute('aria-disabled') === 'true') !== atMax || box.classList.contains('is-max') !== atMax) out.push({ key: k + ' max', msg: '최대값 상태([+] 멈춤 · 주황)가 값(' + v + ')과 맞지 않음' });
+    if ((dn.getAttribute('aria-disabled') === 'true') !== (v == null || v <= min)) out.push({ key: k + ' min', msg: '최소값 상태([−] 멈춤)가 값(' + v + ')과 맞지 않음' });
+    if (colors){
+      const wb = bgOf(well), fg = parse(getComputedStyle(inp).color), r = fg && ratio(over(fg, wb), wb);
+      if (!fg || r < 4.5) out.push({ key: k + (atMax ? ' 주황 숫자' : ' 숫자'), msg: '칸 숫자 대비 ' + (r ? r.toFixed(2) : '?') + ':1 (기준 4.5)' });
+      const ob = bgOf(box.parentElement);
+      for (const e of [dn, well, up]){ const c = parse(getComputedStyle(e).borderTopColor), r2 = c && ratio(over(c, ob), ob); if (!c || r2 < 3) out.push({ key: k + ' 경계 ' + (e.id || 'well'), msg: '부품 경계 대비 ' + (r2 ? r2.toFixed(2) : '?') + ':1 (기준 3)' }); }
+    }
+    const cs = getComputedStyle(inp), sp = document.createElement('span');
+    ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'fontVariantNumeric'].forEach(p => { sp.style[p] = cs[p]; });
+    Object.assign(sp.style, { position: 'absolute', visibility: 'hidden', whiteSpace: 'nowrap' }); sp.textContent = String(max); document.body.append(sp);
+    const need = sp.getBoundingClientRect().width, room = inp.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); sp.remove();
+    if (need > room + 0.5) out.push({ key: k + ' digits', msg: '최대값 ' + max + '이 칸에 다 안 들어감 (' + Math.round(need) + 'px > ' + Math.round(room) + 'px)' });
+  }
+  return { out, n };
+};
+
+// 입체 칩·체크 칸·스위치(v9 단계3): 화면의 모든 체크박스·선택 단추가 셋 중 하나(label.chip · label.crow · label.sw) 안에 있는지(선택자 점검),
+// 스위치는 role=switch + 켜짐/꺼짐 글자가 상태와 같은지, 부품 경계(꺼짐)·고른 표시(켜짐: 채움 또는 테두리)가 바탕과 3:1 이상인지(사용 불가 칸은 제외)
+const TACTILE = colors => {
+  const parse = c => { const m = c.match(/^rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+  const over = (t, b) => { const a = t[3]; return [t[0] * a + b[0] * (1 - a), t[1] * a + b[1] * (1 - a), t[2] * a + b[2] * (1 - a), 1]; };
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const bgOf = el => { const L = []; for (let n = el; n; n = n.parentElement){ const c = parse(getComputedStyle(n).backgroundColor); if (c && c[3] > 0){ L.push(c); if (c[3] >= 1) break; } } let base = [255, 255, 255, 1]; for (let i = L.length - 1; i >= 0; i--) base = over(L[i], base); return base; };
+  const out = [], seen = []; let n = 0;
+  for (const i of document.querySelectorAll('input[type="checkbox"],input[type="radio"]')){
+    const d = i.closest('dialog'); if (d && !d.open) continue;
+    const lab = i.closest('label') || i, r = lab.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || getComputedStyle(i).visibility !== 'visible') continue;
+    n++;
+    const part = i.closest('label.chip') ? 'chip' : i.closest('label.crow') ? 'crow' : i.closest('label.sw') ? 'sw' : null;
+    const k = (i.name ? i.name.replace(/^rr_.*/, 'rr_*') : i.id ? i.id.replace(/^lk_.*/, 'lk_*') : i.dataset.consent ? 'consent:' + i.dataset.consent : i.disabled ? '(묶인 매출)' : '?') + ' ' + i.type;
+    seen.push((part || '없음') + '|' + k);
+    if (!part){ out.push({ key: k, msg: '입체 칩·체크 칸·스위치가 아닌 체크박스/선택 단추' }); continue; }
+    if (part === 'sw'){ const w = lab.querySelector('.sw-st'); if (i.getAttribute('role') !== 'switch' || !w || w.textContent !== (i.checked ? '켜짐' : '꺼짐')) out.push({ key: k, msg: '스위치 role·켜짐/꺼짐 글자가 상태와 다름' }); }
+    if (!colors || i.disabled) continue;
+    const el = part === 'chip' ? lab : i, cs = getComputedStyle(el), bg = bgOf(el.parentElement);
+    const fillOn = i.checked && part !== 'chip' && i.type === 'checkbox';
+    const c = parse(fillOn ? cs.backgroundColor : cs.borderTopColor), rr = c && ratio(over(c, bg), bg);
+    if (!c || rr < 3) out.push({ key: k + (i.checked ? ' 켜짐' : ' 꺼짐'), msg: (fillOn ? '고른 표시(채움)' : i.checked ? '고른 표시(테두리)' : '부품 경계') + ' 대비 ' + (rr ? rr.toFixed(2) : '?') + ':1 (기준 3)' });
+  }
+  return { out, n, seen };
+};
+const PARTS_SEEN = new Set();
+
+// 입체 탭 묶음·필터 칩·날짜 이동 버튼(v9 단계4): 보이는 .seg·.seg-trade마다 고른 칸이 하나(aria-pressed/aria-selected/aria-current),
+// 고른 칸은 볼록(바깥 그림자) · 나머지는 평평(그림자 없음), 고른 칸 테두리가 판(오목) 바탕과 3:1 이상.
+// 필터 칩(.chips button)은 aria-pressed가 있고 고른 칩 = 오목(안쪽 그림자) · 나머지 = 볼록, 경계 3:1.
+// 날짜 이동(data-shift)·처음부터 다시 = 볼록 버튼, 경계 3:1. 스위치 이름은 화면 안에서 서로 달라야 함
+const TACTILE2 = colors => {
+  const parse = c => { const m = c.match(/^rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[\s,\/]+/).filter(Boolean).map(parseFloat); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+  const over = (t, b) => { const a = t[3]; return [t[0] * a + b[0] * (1 - a), t[1] * a + b[1] * (1 - a), t[2] * a + b[2] * (1 - a), 1]; };
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const bgOf = el => { const L = []; for (let n = el; n; n = n.parentElement){ const c = parse(getComputedStyle(n).backgroundColor); if (c && c[3] > 0){ L.push(c); if (c[3] >= 1) break; } } let base = [255, 255, 255, 1]; for (let i = L.length - 1; i >= 0; i--) base = over(L[i], base); return base; };
+  const shown = el => { const r = el.getBoundingClientRect(); const d = el.closest('dialog'); return r.width > 2 && r.height > 2 && getComputedStyle(el).visibility === 'visible' && !(d && !d.open); };
+  // 그림자 목록에서 바깥(볼록) · 안쪽(오목) 그림자가 있는지
+  const sh = el => { const s = getComputedStyle(el).boxShadow; if (s === 'none') return { out: false, ins: false }; const parts = s.split(/,(?![^(]*\))/); return { out: parts.some(x => !/inset/.test(x)), ins: parts.some(x => /inset/.test(x)) }; };
+  const edge = (el, bgEl) => { const c = parse(getComputedStyle(el).borderTopColor), bg = bgOf(bgEl); return c ? ratio(over(c, bg), bg) : 0; };
+  const out = []; let n = 0;
+  for (const g of document.querySelectorAll('.seg, .seg-trade')){
+    if (!shown(g)) continue; n++;
+    const k = g.id ? '#' + g.id : '.' + g.className.split(' ').join('.') + ' "' + (g.getAttribute('aria-label') || '') + '"';
+    const items = [...g.querySelectorAll(':scope > button, :scope > a')];
+    const on = items.filter(b => b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-selected') === 'true' || b.getAttribute('aria-current') === 'page');
+    if (on.length !== 1){ out.push({ key: k + ' 고른 칸', msg: '고른 칸이 ' + on.length + '개' }); continue; }
+    if (!sh(g).ins) out.push({ key: k + ' 판', msg: '판이 오목(안쪽 그림자)이 아님' });
+    for (const b of items){ const s = sh(b), sel = b === on[0];
+      if (sel ? !s.out : s.out || s.ins) out.push({ key: k + ' ' + (b.textContent.trim().slice(0, 12)), msg: sel ? '고른 칸이 볼록(바깥 그림자)이 아님' : '고르지 않은 칸이 평평하지 않음' }); }
+    if (colors){ const r = edge(on[0], g); if (r < 3) out.push({ key: k + ' 고른 칸 테두리', msg: '고른 칸 테두리 대비 ' + r.toFixed(2) + ':1 (기준 3)' }); }
+  }
+  for (const b of document.querySelectorAll('.chips button')){
+    if (!shown(b)) continue; n++;
+    const k = '.chips "' + b.textContent.trim() + '"', ap = b.getAttribute('aria-pressed');
+    if (ap !== 'true' && ap !== 'false'){ out.push({ key: k, msg: 'aria-pressed가 없음' }); continue; }
+    const s = sh(b); if (ap === 'true' ? !s.ins || s.out : !s.out) out.push({ key: k, msg: ap === 'true' ? '고른 칩이 오목(눌림)이 아님' : '고르지 않은 칩이 볼록이 아님' });
+    if (colors){ const r = edge(b, b.parentElement); if (r < 3) out.push({ key: k + (ap === 'true' ? ' 켜짐' : ' 꺼짐'), msg: '칩 ' + (ap === 'true' ? '고른 표시(테두리)' : '경계') + ' 대비 ' + r.toFixed(2) + ':1 (기준 3)' }); }
+  }
+  for (const b of document.querySelectorAll('[data-shift], #resetBtn')){
+    if (!shown(b)) continue; n++;
+    const k = (b.id ? '#' + b.id : '[data-shift=' + b.dataset.shift + ']') + (b.closest('dialog') ? ' (더보기)' : '');
+    if (!b.classList.contains('tk') || !sh(b).out) out.push({ key: k, msg: '날짜 이동·초기화 버튼이 볼록 버튼(.tk)이 아님' });
+    if (colors){ const r = edge(b, b.parentElement); if (r < 3) out.push({ key: k + ' 경계', msg: '버튼 경계 대비 ' + r.toFixed(2) + ':1 (기준 3)' }); }
+  }
+  const sw = [...document.querySelectorAll('[role="switch"]')].filter(i => shown(i.closest('label') || i)).map(i => i.getAttribute('aria-label') || (i.labels[0] && i.labels[0].textContent.trim()) || '');
+  if (sw.length){ n++; if (new Set(sw).size !== sw.length) out.push({ key: '스위치 이름', msg: '같은 이름의 스위치가 있음: ' + sw.join(' / ') }); }
+  return { out, n };
+};
+
 // 휴대폰 글자 크기 200%: 모든 요소의 글자 크기·줄 간격(px)을 두 배로 (페이지가 px 단위라 브라우저 글자 확대와 같은 효과)
 const TEXT200 = () => {
   const all = [...document.querySelectorAll('body *')].filter(el => !el.closest('svg'));
@@ -235,10 +348,25 @@ async function openHash(p, h){
     await p.reload(); await p.waitForTimeout(150);
     return;
   }
-  if (h === 'saledetail' || h === 'newtrade'){
+  if (h === 'saledetail' || h === 'newtrade' || h === 'newtrade-max'){
     await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
-    await p.evaluate(x => (x === 'newtrade' ? [...document.querySelectorAll('[data-act="newTrade"]')].find(b => b.offsetParent) : [...document.querySelectorAll('#saleRows li')].find(l => l.textContent.includes('연체')).querySelector('.tr-open')).click(), h);
+    await p.evaluate(x => (x !== 'saledetail' ? [...document.querySelectorAll('[data-act="newTrade"]')].find(b => b.offsetParent) : [...document.querySelectorAll('#saleRows li')].find(l => l.textContent.includes('연체')).querySelector('.tr-open')).click(), h);
     await p.waitForTimeout(150);
+    // 수량 조절기를 최대(9999)로: 칸에서 End → 튕김이 끝난 뒤 포커스를 빼 평소 모양으로
+    if (h === 'newtrade-max'){ await p.focus('#ntQty'); await p.keyboard.press('End'); await p.waitForTimeout(450); await p.evaluate(() => document.activeElement.blur()); }
+    return;
+  }
+  if (h === 'apply-tier'){
+    // 플로우페이 신청(대성원료 1,573만원) → 매출 2건 묶기 → 서류 올리기 → 4단계 결제 기간 조절기에서 End(90일, 최대)
+    await p.evaluate(() => location.hash = 'orders'); await p.waitForTimeout(150);
+    const nx = async () => { await p.evaluate(() => document.querySelector('#dlgFoot [data-act="stepNext"]').click()); await p.waitForTimeout(150); };
+    await p.evaluate(() => [...document.querySelectorAll('#orderRows li')].find(l => l.textContent.includes('1,573만원')).querySelector('[data-act="finance"]').click()); await p.waitForTimeout(150);
+    await nx();
+    for (const t of ['그린마켓', '440만원']) { await p.evaluate(x => [...document.querySelectorAll('#dlg .docrow')].find(r => r.textContent.includes(x)).querySelector('input').click(), t); await p.waitForTimeout(150); }  // 고를 때마다 시트를 다시 그리므로 하나씩
+    await nx();
+    while (await p.evaluate(() => { const L = [...document.querySelectorAll('dialog [data-act="upload"][data-ctx="apply"]')].filter(x => !x.textContent.includes('미리')); if (L[0]) L[0].click(); return L.length; })) await p.waitForTimeout(120);
+    await nx();
+    await p.focus('#tierIn'); await p.keyboard.press('End'); await p.waitForTimeout(450); await p.evaluate(() => document.activeElement.blur());
     return;
   }
   if (h === 'fwdsheet'){
@@ -272,6 +400,46 @@ async function openHash(p, h){
     // 상세: 마지막 줄(세진화학 발주 · 납품 예정일·요구사항 확인 필요) / 수정: 첫 줄(오렌지유통 계산서 후보)의 상세 → 수정
     await p.evaluate(x => { const os = document.querySelectorAll('#ibList .ib-open'); os[x === 'ibdetail' ? os.length - 1 : 0].click(); }, h); await p.waitForTimeout(150);
     if (h === 'ibedit'){ await p.evaluate(() => document.querySelector('#dlgBody [data-act="ibEdit"]').click()); await p.waitForTimeout(150); }
+    return;
+  }
+  if (h === 'apply-link'){
+    // 플로우페이 1건 신청한 뒤 다른 매입의 2단계: 고를 수 있는 줄 + 다른 신청에 묶인 줄(사용 불가)
+    await p.evaluate(() => location.hash = 'orders'); await p.waitForTimeout(150);
+    await p.evaluate(() => [...document.querySelectorAll('#orderRows [data-act="finance"]')].find(x => x.offsetParent).click()); await p.waitForTimeout(150);
+    await p.evaluate(() => document.querySelector('#dlgFoot [data-act="stepNext"]').click()); await p.waitForTimeout(150);
+    await p.evaluate(() => { const i = document.querySelector('#dlgBody label.docrow input:not(:disabled)'); if (i) i.click(); }); await p.waitForTimeout(150);
+    await p.evaluate(() => document.activeElement.blur());
+    return;
+  }
+  if (h === 'apply-ar'){
+    await p.evaluate(() => location.hash = 'factoring'); await p.waitForTimeout(150);
+    await p.evaluate(() => document.querySelector('#arRows [data-act="factor"]').click()); await p.waitForTimeout(150);
+    await p.evaluate(() => document.getElementById('arc1').click()); await p.waitForTimeout(100);  // 한 칸은 켜짐, 한 칸은 꺼짐
+    await p.evaluate(() => document.activeElement.blur());
+    return;
+  }
+  if (h === 'pick'){
+    // 매출 상세 시트의 "플로우페이 신청" → 결제할 매입 고르기(선택 단추 줄). 첫 줄을 고른 상태
+    await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
+    const n = await p.evaluate(() => document.querySelectorAll('#saleRows li.tr-row .tr-open').length);
+    for (let i = 0; i < n; i++){
+      await p.evaluate(x => document.querySelectorAll('#saleRows li.tr-row .tr-open')[x].click(), i); await p.waitForTimeout(120);
+      if (await p.evaluate(() => { const b = document.querySelector('#dlgBody [data-act="fpSale"]'); if (b) b.click(); return !!b; })){ await p.waitForTimeout(150); break; }
+      await p.evaluate(() => document.querySelector('#dlgLeft [data-act="close"]').click()); await p.waitForTimeout(80);
+    }
+    await p.evaluate(() => { const i = document.querySelector('#dlgBody input[name="pk"]'); if (i) i.click(); document.activeElement.blur(); }); await p.waitForTimeout(300);  // 다음 버튼 색 전환이 끝난 뒤 측정
+    return;
+  }
+  if (h === 'link-sign' || h === 'link-tax'){
+    // 매입처 링크 2단계(서명 동의 체크 칸) · 3단계(세금계산서 처리 방식 선택 칸, 정발행 고름)
+    await p.evaluate(k => location.hash = 'link/' + JSON.parse(localStorage.getItem(k)).deals[0].token, KEY); await p.waitForTimeout(150);
+    await p.evaluate(() => document.querySelector('#lkBody [data-act="lkNext"]').click()); await p.waitForTimeout(120);
+    if (h === 'link-tax'){
+      await p.evaluate(() => document.getElementById('lkAgree').click()); await p.waitForTimeout(80);
+      await p.evaluate(() => document.getElementById('lkSignBtn').click()); await p.waitForTimeout(120);
+      await p.evaluate(() => document.querySelector('#lkBody input[name="lkTax"][value="issue"]').click()); await p.waitForTimeout(80);
+    }
+    await p.evaluate(() => document.activeElement.blur());
     return;
   }
   if (h === 'link'){
@@ -308,6 +476,11 @@ async function openHash(p, h){
     await p.evaluate(() => { const d = document.querySelector('#scLedger details.led-more'); if (d) d.open = true; }); await p.waitForTimeout(80);
     return;
   }
+  if (h === 'scorereq'){
+    await openHash(p, 'company');
+    await p.evaluate(() => [...document.querySelectorAll('[data-act="scReqOpen"]')].find(x => x.offsetParent).click()); await p.waitForTimeout(150);
+    return;
+  }
   if (h === 'company'){
     await p.evaluate(() => location.hash = 'score'); await p.waitForTimeout(120);
     await p.click('#scSeg [data-sc="sale"]'); await p.waitForTimeout(80);
@@ -341,7 +514,7 @@ async function makeReviewState(b){
   await p.evaluate(() => location.hash = 'orders'); await p.waitForTimeout(120);
   await p.locator('#orderRows li', { hasText: '1,573만원' }).locator('[data-act="finance"]').click(); await p.waitForTimeout(150);
   await next();
-  await p.locator('dialog label.check', { hasText: '그린마켓' }).locator('input').check(); await p.waitForTimeout(150);
+  await p.locator('dialog label.crow', { hasText: '그린마켓' }).locator('input').check(); await p.waitForTimeout(150);
   await p.locator('#dlg .docrow', { hasText: '440만원' }).locator('input').check(); await p.waitForTimeout(150);  // 묶은 매출 합계 ≥ 납품액
   await next();
   while (await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').count()){ await p.locator('dialog [data-act="upload"][data-ctx="apply"]:not(:has-text("미리"))').first().click(); await p.waitForTimeout(120); }
@@ -349,13 +522,13 @@ async function makeReviewState(b){
   await p.click('dialog [data-act="submitApply"]'); await p.waitForTimeout(150);
   await p.evaluate(() => location.hash = 'flowpay'); await p.waitForTimeout(120);
   while (await p.locator('#apps [data-act="cfm"]').count()){ await p.locator('#apps [data-act="cfm"]').first().click(); await p.waitForTimeout(120); }
-  const st = JSON.parse(await p.evaluate(k => localStorage.getItem(k), KEY));
+  const st = JSON.parse(await p.evaluate(k => localStorage.getItem(k), KEY)), applied = JSON.stringify(st);  // 대표가 플로우페이 1건 신청(거래 상대 확인)한 상태
   // 거래 문서 상태: 심사 승인 → 전자서명(매입처 링크 1단계) → 링크 서명·역발행 승인 → 276 지급·발행(납품 확인 대기)
   await p.click('#roleBtn'); await p.waitForTimeout(150);
   // 심사 대기 줄의 승인 → 사유 창: 미리 체크를 풀고 '입금 이력 양호'만 골라 승인
   await p.click('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.waitForTimeout(150);
-  await p.locator('#dlgBody .reasons input:checked').evaluateAll(xs => xs.forEach(x => x.click()));
-  await p.locator('#dlgBody .reasons label', { hasText: '입금 이력 양호' }).locator('input').check();
+  await p.locator('#dlgBody .tk-chips input:checked').evaluateAll(xs => xs.forEach(x => x.click()));
+  await p.locator('#dlgBody label.chip', { hasText: '입금 이력 양호' }).click();
   await p.click('#rrOk'); await p.waitForTimeout(150);
   await p.click('#roleBtn'); await p.waitForTimeout(150);
   await p.click('[data-act="sign"]'); await p.waitForTimeout(150);
@@ -394,7 +567,7 @@ async function makeReviewState(b){
   st.role = 'reviewer';
   return { 'score-ledger': JSON.stringify(ledSt), review: JSON.stringify(st), rvdetail: JSON.stringify(st), rvreason: JSON.stringify(st), 'intro-review-q': JSON.stringify(st), link: signSt, deals: JSON.stringify(ready), dealdetail: JSON.stringify(ready), docprev: JSON.stringify(ready), delivery: JSON.stringify(ready),
     actsheet: JSON.stringify(st), calendar: JSON.stringify(ready), notif: JSON.stringify(thanksSt), thanks: JSON.stringify(thanksSt),
-    fwdsheet: JSON.stringify(ready), sales: later, flowpay: fwd1 };
+    fwdsheet: JSON.stringify(ready), sales: later, flowpay: fwd1, 'apply-link': applied, 'link-sign': signSt, 'link-tax': signSt };
 }
 
 async function newPage(b, opt, state){
@@ -417,7 +590,7 @@ async function auditPass(b, opt, reviewState, label){
     await openHash(p, h);
     const ctxName = label + ' #' + h;
     const now = await p.evaluate(() => location.hash);
-    if (h !== 'company' && h !== 'link' && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h.replace(/-(a[rp]|linked|ledger|q|empty)$/, '')) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
+    if (h !== 'company' && h.indexOf('link') !== 0 && h !== 'dealdetail' && !SHEETS.includes(h) && now !== '#' + h.replace(/-(a[rp]|linked|ledger|q|empty)$/, '')) fail('route', h, '해시가 ' + now + '로 바뀜', ctxName);
     // 심사 대기: 1건(목록 표) · 빈 상태(심사 대기 0건)가 실제로 점검 대상인지
     if (h === 'review' || h === 'review-empty'){
       const rv = await p.evaluate(() => [document.querySelectorAll('#rvQueue tbody tr').length, (document.querySelector('#rvQueue .rv-empty-t') || {}).textContent || '']);
@@ -443,6 +616,17 @@ async function auditPass(b, opt, reviewState, label){
       const o = await p.evaluate(OBSCURED); count('obscured', o.n);
       o.out.forEach(x => fail('obscured', x.key, x.msg, ctxName));
     }
+    { const tk = await p.evaluate(TACTILE, opt.forced !== 'active'); count('tactile', tk.n);
+      tk.seen.forEach(x => PARTS_SEEN.add(x)); tk.out.forEach(x => fail('tactile', x.key, x.msg, ctxName)); }
+    // 강제 색상에서는 그림자가 사라지므로(고른 칸은 강조색 테두리) 볼록·오목·대비는 건너뛰고 고른 칸 수·aria-pressed·스위치 이름만
+    { const t2 = await p.evaluate(TACTILE2, opt.forced !== 'active'); count('tactile2', t2.n);
+      t2.out.filter(x => opt.forced !== 'active' || !/볼록|오목|평평/.test(x.msg)).forEach(x => fail('tactile2', x.key, x.msg, ctxName)); }
+    if (STEPPER_SHEETS.includes(h)){
+      const sp = await p.evaluate(STEPPER, opt.forced !== 'active'); count('stepper', sp.n);
+      if (!sp.n) fail('stepper', h, '숫자 조절기가 없음', ctxName);
+      if (h === 'newtrade-max' || h === 'apply-tier'){ const mx = await p.evaluate(() => [...document.querySelectorAll('dialog[open] .stp.is-max')].length); if (!mx) fail('stepper', h + ' max', '최대값(주황) 상태가 아님', ctxName); }
+      sp.out.forEach(x => fail('stepper', x.key, x.msg, ctxName));
+    }
     errs.forEach(e => fail('errors', e, e, ctxName));
     await ctx.close();
   }
@@ -466,6 +650,7 @@ async function zoomPass(b, reviewState){
       sp.forEach(x => fail('zoom-spill', x.key, x.msg, ctxName));
       const ov = await p.evaluate(OVERLAP); count('zoom-overlap', 1);
       ov.forEach(x => fail('zoom-overlap', x.key, x.msg, ctxName));
+      if (STEPPER_SHEETS.includes(h)){ const sp = await p.evaluate(STEPPER, true); count('stepper', sp.n); sp.out.forEach(x => fail('stepper', x.key, x.msg, ctxName)); }
       if (!SHEETS.includes(h)){
         const o = await p.evaluate(OBSCURED); count('zoom-obscured', o.n);
         o.out.forEach(x => fail('zoom-obscured', x.key, x.msg, ctxName));
@@ -535,6 +720,10 @@ async function keyboardPass(b, reviewState){
     await p.keyboard.press('ArrowLeft'); await p.waitForTimeout(120);
     const seg2 = await p.evaluate(() => document.querySelector('#scSeg [aria-pressed="true"]').dataset.sc);
     if (seg2 !== 'me') fail('keys', 'seg-left', '왼쪽 화살표로 우리 회사로 돌아가지 않음 (' + seg2 + ')', C);
+    // 입체 탭 묶음: 화살표로 옮긴 뒤 볼록한 칸(바깥 그림자)도 새로 고른 칸 하나뿐
+    count('keys', 1); await p.waitForTimeout(200);  // 칸 그림자 전환(120ms)이 끝난 뒤
+    const raised = await p.evaluate(() => [...document.querySelectorAll('#scSeg [data-sc]')].filter(b => getComputedStyle(b).boxShadow !== 'none').map(b => b.dataset.sc).join());
+    if (raised !== 'me') fail('keys', 'seg-raised', '화살표로 고른 칸만 볼록이 아님 (볼록: ' + raised + ')', C);
     // 매출 목록: 줄(업체)에서 Enter → 상세 시트(포커스는 시트 안), Esc → 닫히고 그 줄로 포커스가 돌아옴
     await p.evaluate(() => location.hash = 'sales'); await p.waitForTimeout(150);
     count('keys', 2);
@@ -581,8 +770,8 @@ async function keyboardPass(b, reviewState){
     await p.evaluate(() => location.hash = 'review'); await p.waitForTimeout(150);
     count('keys', 2);
     await p.focus('#rvQueue tbody tr [data-act="rvReason"][data-r="approve"]'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
-    const o = await p.evaluate(() => [document.getElementById('dlg').open, !!document.activeElement.closest('dialog'), document.getElementById('dlgTitle').textContent, document.querySelectorAll('#dlgBody .reasons input:checked').length, document.getElementById('rrOk').disabled]);
-    await p.evaluate(() => document.querySelectorAll('#dlgBody .reasons input:checked').forEach(x => x.click())); await p.waitForTimeout(80);
+    const o = await p.evaluate(() => [document.getElementById('dlg').open, !!document.activeElement.closest('dialog'), document.getElementById('dlgTitle').textContent, document.querySelectorAll('#dlgBody .tk-chips input:checked').length, document.getElementById('rrOk').disabled]);
+    await p.evaluate(() => document.querySelectorAll('#dlgBody .tk-chips input:checked').forEach(x => x.click())); await p.waitForTimeout(80);
     const off = await p.evaluate(() => document.getElementById('rrOk').disabled);
     if (!o[0] || !o[1] || o[2] !== '승인 사유' || !o[3] || o[4] || !off) fail('keys', 'rv-reason-open', '줄의 승인 Enter로 사유 창이 열리고(포커스 시트 안 · 추천 사유 체크 · 확정 활성) 사유 0개면 비활성이 아님 (' + o + ', ' + off + ')', C + ' #review');
     await p.keyboard.press('Escape'); await p.waitForTimeout(150);
@@ -661,6 +850,8 @@ async function keyboardPass(b, reviewState){
       await p.keyboard.press(k); await p.waitForTimeout(150);
       const got = await now();
       if (got !== want) fail('keys', 'rp-tab-' + k + '-' + want.split('|')[0], '자금일보 탭에서 ' + k + ' 후 ' + got + ' (기대 ' + want + ')', C + ' #report');
+      const raised = await p.evaluate(() => [...document.querySelectorAll('#reportBody [role="tab"]')].filter(b => getComputedStyle(b).boxShadow !== 'none').map(b => b.dataset.tab).join());
+      if (raised !== want.split('|')[0]) fail('keys', 'rp-tab-raised-' + k, '자금일보 탭 ' + k + ' 후 볼록한 칸이 고른 탭 하나가 아님 (볼록: ' + raised + ')', C + ' #report');
     }
     await ctx.close();
   }
@@ -687,6 +878,30 @@ async function keyboardPass(b, reviewState){
     const e2 = await p.evaluate(() => [document.getElementById('dlg').open, document.activeElement.id, document.getElementById('rpRecon').textContent.trim()]);
     if (e2[0] || e2[1] !== 'rpRecon' || e2[2] !== '합계 일치 ✓') fail('keys', 'recon-link', '"연결" Enter 후 시트가 닫히고 "합계 일치 ✓" 알약에 포커스가 아님 (' + e2 + ')', C4);
     await ctx.close();
+  }
+  // (2-5) 숫자 조절기: 새 거래 수량 — Tab 순서 [−] → 칸 → [+] → 단가, 칸에서 ↑↑↓·PageUp·End·Home, [+]에서 Enter·Space(포커스 그대로)
+  //       결제 기간 — 칸에서 Home·↑(시트를 다시 그려도 포커스는 칸에), [+]에서 Space로 90일(포커스는 [+]에 · aria-disabled), 한 번 더 눌러도 90일
+  {
+    const C5 = '키보드 1280 라이트 숫자 조절기';
+    const { ctx, p } = await newPage(b, { w: 1280, h: 800 });
+    await openHash(p, 'newtrade'); count('keys', 4);
+    await p.focus('#saleForm [name="item"]'); const order = [];
+    for (let i = 0; i < 4; i++){ await p.keyboard.press('Tab'); order.push(await p.evaluate(() => document.activeElement.id || document.activeElement.name)); }
+    if (order.join() !== 'ntQty_dn,ntQty,ntQty_up,price') fail('keys', 'stp-tab', '수량 조절기 Tab 순서가 [−] → 칸 → [+] → 단가가 아님 (' + order + ')', C5);
+    await p.focus('#ntQty'); const seq = [];
+    for (const k of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'PageUp', 'End', 'Home']){ await p.keyboard.press(k); seq.push(await p.evaluate(() => document.getElementById('ntQty').value)); }
+    if (seq.join() !== '1,2,1,11,9999,1') fail('keys', 'stp-keys', '수량 칸 ↑↑↓·PageUp·End·Home 결과가 1,2,1,11,9999,1이 아님 (' + seq + ')', C5);
+    await p.focus('#ntQty_up'); await p.keyboard.press('Enter'); await p.keyboard.press('Space');
+    const eb = await p.evaluate(() => [document.getElementById('ntQty').value, document.activeElement.id]);
+    if (eb.join() !== '3,ntQty_up') fail('keys', 'stp-btn', '[+]에서 Enter·Space로 1 → 3이 되고 포커스가 [+]에 남지 않음 (' + eb + ')', C5);
+    await ctx.close();
+    const t = await newPage(b, { w: 1280, h: 800 });
+    await openHash(t.p, 'apply-tier');
+    const tv = () => t.p.evaluate(() => [document.getElementById('tierIn').value, document.activeElement.id, document.getElementById('tierIn_up').getAttribute('aria-disabled')].join());
+    await t.p.focus('#tierIn'); await t.p.keyboard.press('Home'); const k1 = await tv(); await t.p.keyboard.press('ArrowUp'); const k2 = await tv();
+    await t.p.focus('#tierIn_up'); await t.p.keyboard.press('Space'); const k3 = await tv(); await t.p.keyboard.press('Space'); const k4 = await tv();
+    if ([k1, k2, k3, k4].join(' / ') !== '30,tierIn,false / 60,tierIn,false / 90,tierIn_up,true / 90,tierIn_up,true') fail('keys', 'stp-tier', '결제 기간 조절기 Home·↑·Space 결과·포커스가 기대와 다름 (' + [k1, k2, k3, k4].join(' / ') + ')', C5);
+    await t.ctx.close();
   }
   // (3) 휴대폰: 거래 세그먼트 화살표, 더보기 시트 Esc
   {
@@ -729,7 +944,7 @@ const AUDIT_FOCUS = () => {
 async function mediaPass(b){
   {
     const { ctx, p } = await newPage(b, { w: 1280, h: 800, motion: 'reduce' });
-    for (const h of ['home', 'orders', 'flowpay', 'score']){
+    for (const h of ['home', 'orders', 'flowpay', 'score', 'report', 'fund', 'newtrade', 'apply-tier', 'inbox', 'shortsheet-hold']){
       await openHash(p, h);
       const moving = await p.evaluate(() => {
         const out = [];
@@ -744,6 +959,13 @@ async function mediaPass(b){
       });
       count('reduced-motion', 1);
       moving.forEach(m => fail('reduced-motion', m, '움직임 줄이기 설정에서도 전환/애니메이션이 남아 있음', '1280 reduce #' + h));
+      // 숫자 조절기: 움직임 줄이기면 값만 바뀌고 튕김(.rolling) 없음
+      if (h === 'newtrade' || h === 'apply-tier'){
+        const r = await p.evaluate(x => { const up = () => document.getElementById(x === 'newtrade' ? 'ntQty_up' : 'tierIn_dn'); if (x === 'newtrade') up().click(); up().click(); const w = document.querySelector('dialog[open] .stp-well'); return [w.classList.contains('rolling'), !!w.querySelector('.stp-roll'), document.querySelector('dialog[open] .stp input').value]; }, h);
+        count('reduced-motion', 1);
+        if (r[0] || r[1] || r[2] === '' || r[2] === '90') fail('reduced-motion', 'stepper ' + h, '움직임 줄이기에서도 숫자 튕김이 있거나 값이 안 바뀜 (' + r + ')', '1280 reduce #' + h);
+        await p.evaluate(() => document.getElementById('dlgLeft').querySelector('[data-act]').click()); await p.waitForTimeout(100);
+      }
     }
     await ctx.close();
   }
@@ -777,11 +999,11 @@ async function mediaPass(b){
     contrast: '글자 대비 (본문 4.5:1, 큰 글자 3:1)', target: '누르는 영역 44×44px', overflow: '가로 스크롤 없음', charts: '차트 설명·한 줄 요약',
     obscured: '휴대폰: 고정 막대에 가려지는 버튼 없음', 'zoom-overflow': '확대 200%: 가로 스크롤 없음', 'zoom-overlap': '확대 200%: 큰 덩어리 겹침 없음', 'zoom-spill': '확대 200%: 글자 넘침·잘림 없음',
     'zoom-obscured': '확대 200%: 가려지는 버튼 없음', focus: '키보드 포커스 표시', keys: '키보드 동작 (Enter·Esc·화살표)', 'reduced-motion': '움직임 줄이기',
-    'contrast-more': '고대비 설정', route: '해시 주소', errors: '페이지 오류'
+    'contrast-more': '고대비 설정', stepper: '숫자 조절기 (이름·값 · 끝값 · 칸 숫자 4.5:1 · 경계 3:1 · 네 자리)', tactile: '입체 칩·체크 칸·스위치 (모든 체크박스·선택 단추 · 켜짐/꺼짐 글자 · 경계·고른 표시 3:1)', tactile2: '입체 탭 묶음·필터 칩·날짜 이동 버튼 (고른 칸 볼록·나머지 평평 · 칩 aria-pressed · 고른 표시·경계 3:1 · 스위치 이름 서로 다름)', route: '해시 주소', errors: '페이지 오류'
   };
   let total = 0;
   console.log('접근성 점검: ' + process.argv[2]);
-  console.log('범위: 화면 ' + HASHES.length + '개 × 1280·820·390 × 라이트·다크, 고대비(라이트·다크), 강제 색상, 확대 200%(1280 페이지 확대, 390 글자 확대), 키보드, 움직임 줄이기\n');
+  console.log('범위: 화면 ' + HASHES.length + '개 × 1280·820·390 × 라이트·다크, 고대비(라이트·다크), 강제 색상, 확대 200%(1280 페이지 확대, 390 글자 확대), 키보드, 움직임 줄이기, 숫자 조절기(' + STEPPER_SHEETS.join('·') + '), 입체 칩·체크 칸·스위치·탭 묶음·필터 칩·날짜 이동 버튼(모든 화면)\n');
   for (const k of Object.keys(NAMES)){
     const m = fails[k];
     const n = m ? m.size : 0; total += n;
@@ -792,6 +1014,8 @@ async function mediaPass(b){
     console.log('\n예외 ' + (NAMES[k.slice(10)] || k) + ' — ' + fails[k].size + '건 (실패로 세지 않음)');
     for (const [key, v] of fails[k]) console.log('   - ' + key + ': ' + v.msg);
   }
+  { const by = {}; [...PARTS_SEEN].forEach(x => { const [pt, k] = x.split('|'); (by[pt] = by[pt] || new Set()).add(k); });
+    notes.push('체크박스·선택 단추 선택자 점검: ' + ['chip', 'crow', 'sw', '없음'].filter(pt => by[pt]).map(pt => ({ chip: '입체 칩', crow: '체크 칸 줄', sw: '스위치', '없음': '입체 부품 아님' }[pt]) + ' ' + by[pt].size + '종 (' + [...by[pt]].sort().join(', ') + ')').join(' / ')); }
   if (notes.length) console.log('\n참고:\n   - ' + notes.join('\n   - '));
   console.log('\n결과: ' + (total ? '실패 ' + total + '건' : '모두 통과'));
   process.exit(total ? 1 : 0);
